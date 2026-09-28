@@ -67,14 +67,14 @@ export function packRgb9e5ufloat(c: Const<Color>): number {
     const max = Math.max(r, g, b);
     // shared exponent with bias 15, raised when the largest mantissa rounds up to 2^9
     let e = max < 2 ** -16 ? 0 : floorLog2(max) + 16;
-    if (Math.floor(max * 2 ** (24 - e) + 0.5) === 512) e++;
-    const s = 2 ** (24 - e);
+    if (Math.floor(max * pow2(24 - e) + 0.5) === 512) e++;
+    const s = pow2(24 - e);
     return (Math.floor(r * s + 0.5) | (Math.floor(g * s + 0.5) << 9) | (Math.floor(b * s + 0.5) << 18) | (e << 27)) >>> 0;
 }
 
 /** Unpack an 'rgb9e5ufloat' texel into `out`, leaving alpha untouched. Returns `out`. */
 export function unpackRgb9e5ufloat(out: Color, v: number): Color {
-    const s = 2 ** ((v >>> 27) - 24);
+    const s = pow2((v >>> 27) - 24);
     out[0] = (v & 511) * s;
     out[1] = ((v >>> 9) & 511) * s;
     out[2] = ((v >>> 18) & 511) * s;
@@ -111,7 +111,7 @@ export function packRgbe(c: Const<Color>): number {
     if (max < 1e-32) return 0;
     // frexp(max) = m * 2^e with m in [0.5, 1), so bytes are floor(channel * 256 / 2^e)
     const e = floorLog2(max) + 1;
-    const s = 2 ** (8 - e);
+    const s = pow2(8 - e);
     return (Math.floor(r * s) | (Math.floor(g * s) << 8) | (Math.floor(b * s) << 16) | ((e + 128) << 24)) >>> 0;
 }
 
@@ -121,7 +121,7 @@ export function packRgbe(c: Const<Color>): number {
  */
 export function unpackRgbe(out: Color, v: number): Color {
     const e = v >>> 24;
-    const s = e === 0 ? 0 : 2 ** (e - 136);
+    const s = e === 0 ? 0 : pow2(e - 136);
     out[0] = (v & 255) * s;
     out[1] = ((v >>> 8) & 255) * s;
     out[2] = ((v >>> 16) & 255) * s;
@@ -159,11 +159,22 @@ function clamp(x: number, max: number): number {
     return x > 0 ? (x < max ? x : max) : 0;
 }
 
-// exact floor(log2(x)) for positive finite x, correcting Math.log2 rounding near powers of two
+// float64 bit access for exponents, several times faster than Math.log2 and 2 ** e.
+// Index 1 is the high word on little-endian platforms, which is every JavaScript runtime in use
+const _packing_f64 = /* @__PURE__ */ new Float64Array(1);
+const _packing_u32 = /* @__PURE__ */ new Uint32Array(_packing_f64.buffer);
+
+// exact floor(log2(x)) for positive normal x, read from the exponent bits
 function floorLog2(x: number): number {
-    const e = Math.floor(Math.log2(x));
-    const m = x * 2 ** -e;
-    return m < 1 ? e - 1 : m >= 2 ? e + 1 : e;
+    _packing_f64[0] = x;
+    return ((_packing_u32[1] >>> 20) & 2047) - 1023;
+}
+
+// exactly 2^e for integer e in [-1022, 1023], written as exponent bits
+function pow2(e: number): number {
+    _packing_u32[0] = 0;
+    _packing_u32[1] = (e + 1023) << 20;
+    return _packing_f64[0];
 }
 
 // Math.round with ties to even
@@ -177,7 +188,7 @@ function roundEven(x: number): number {
 function smallFloat(x: number, m: number): number {
     if (x < 2 ** -14) return roundEven(x * 2 ** (14 + m));
     const e = floorLog2(x);
-    return ((e + 15) << m) + roundEven((x * 2 ** -e - 1) * 2 ** m);
+    return ((e + 15) << m) + roundEven((x * pow2(-e) - 1) * (1 << m));
 }
 
 // unsigned float with m mantissa bits, saturating at the largest finite (2 - 2^-m) * 2^15
@@ -189,6 +200,6 @@ function ufloat(x: number, m: number): number {
 function unpackFloat(bits: number, m: number): number {
     const e = bits >>> m;
     const f = bits & ((1 << m) - 1);
-    if (e === 0) return f * 2 ** (-14 - m);
-    return e < 31 ? (f + (1 << m)) * 2 ** (e - 15 - m) : f ? Number.NaN : Number.POSITIVE_INFINITY;
+    if (e === 0) return f * pow2(-14 - m);
+    return e < 31 ? (f + (1 << m)) * pow2(e - 15 - m) : f ? Number.NaN : Number.POSITIVE_INFINITY;
 }
