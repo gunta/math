@@ -15,6 +15,7 @@ export * as packing from './packing';
 export * as tonemap from './tonemap';
 
 export type { Color, ColorInput } from './color';
+export type { CSSColorSpace } from './colorspace';
 export type { HSL } from './hsl';
 export type { HueInterpolation } from './hue';
 export type { ICtCp } from './ictcp';

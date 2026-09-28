@@ -112,4 +112,12 @@ describe('color', () => {
         expect(color.luminance([0, 1, 0])).toBeGreaterThan(color.luminance([1, 0, 0]));
         expect(color.luminance([1, 0, 0])).toBeGreaterThan(color.luminance([0, 0, 1]));
     });
+
+    it('measures WCAG 2 contrast and picks a readable text color', () => {
+        expect(color.contrastRatio([1, 1, 1], [0, 0, 0])).toBeCloseTo(21, 12);
+        expect(color.contrastRatio(color.fromColorInput('#767676') as color.Color, [1, 1, 1])).toBeCloseTo(4.54, 2);
+        // CSS contrast-color(): black on light backgrounds, white on dark ones
+        expect(color.contrastColor(color.create(), color.fromColorInput('gold') as color.Color)).toEqual([0, 0, 0]);
+        expect(color.contrastColor(color.create(), color.fromColorInput('navy') as color.Color)).toEqual([1, 1, 1]);
+    });
 });

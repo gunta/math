@@ -1,5 +1,22 @@
 import type { Const } from '../core/const';
 import type { Color } from './color';
+import { formatAlpha, formatNumber } from './format';
+
+/** A predefined color space of the CSS color() function (CSS Color 4 and CSS Color HDR). */
+export type CSSColorSpace =
+    | 'srgb'
+    | 'srgb-linear'
+    | 'display-p3'
+    | 'display-p3-linear'
+    | 'a98-rgb'
+    | 'prophoto-rgb'
+    | 'rec2020'
+    | 'rec2100-pq'
+    | 'rec2100-hlg'
+    | 'rec2100-linear'
+    | 'xyz'
+    | 'xyz-d50'
+    | 'xyz-d65';
 
 // Color-space conversions (pure functions, no global working-space state).
 //
@@ -309,4 +326,13 @@ export function rec2100HlgToLinearSrgb(out: Color, c: Const<Color>): Color {
     out[1] = hlgToLinear(c[1]) * 3.7743;
     out[2] = hlgToLinear(c[2]) * 3.7743;
     return linearRec2020ToLinearSrgb(out, out);
+}
+
+/**
+ * Create a CSS `color(<space> ...)` string from channel values already in `space`, with an optional alpha.
+ * It only formats, so a bundle pays only for the conversions it calls, for example
+ * `toCSS('display-p3', linearSrgbToDisplayP3(tmp, c))`.
+ */
+export function toCSS(space: CSSColorSpace, values: Const<Color>, alpha = 1): string {
+    return `color(${space} ${formatNumber(values[0], 6)} ${formatNumber(values[1], 6)} ${formatNumber(values[2], 6)}${formatAlpha(alpha)})`;
 }

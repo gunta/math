@@ -273,6 +273,28 @@ export function luminance(c: Const<Color>): number {
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }
 
+/** WCAG 2 contrast ratio between two colors, from 1 (none) to 21 (black on white). Order does not matter. */
+export function contrastRatio(a: Const<Color>, b: Const<Color>): number {
+    const la = Math.max(0, 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]);
+    const lb = Math.max(0, 0.2126 * b[0] + 0.7152 * b[1] + 0.0722 * b[2]);
+    return la > lb ? (la + 0.05) / (lb + 0.05) : (lb + 0.05) / (la + 0.05);
+}
+
+/**
+ * Write white or black into `out`, whichever has the higher WCAG 2 contrast against `background`
+ * (CSS Color 5 contrast-color(), ties pick white). The result is always at least 4.58:1. Returns `out`.
+ */
+export function contrastColor(out: Color, background: Const<Color>): Color {
+    const l = Math.max(0, 0.2126 * background[0] + 0.7152 * background[1] + 0.0722 * background[2]);
+    // white wins when 1.05 / (l + 0.05) >= (l + 0.05) / 0.05
+    const v = (l + 0.05) * (l + 0.05) <= 0.0525 ? 1 : 0;
+    out[0] = v;
+    out[1] = v;
+    out[2] = v;
+    if (out.length > 3) out[3] = 1;
+    return out;
+}
+
 function clamp01(x: number): number {
     return x < 0 ? 0 : x > 1 ? 1 : x;
 }

@@ -73,4 +73,12 @@ describe('colorspace', () => {
         expect(colorspace.hlgToLinear(colorspace.linearToHlg(0.6))).toBeCloseTo(0.6, 12);
         expectColor(colorspace.linearSrgbToRec2100Hlg(color.create(), [1, 1, 1]), [0.75, 0.75, 0.75], 4);
     });
+
+    it('serializes channel values to CSS color()', () => {
+        const p3 = colorspace.linearSrgbToDisplayP3(color.create(), [1, 0, 0]);
+        expect(colorspace.toCSS('display-p3', p3)).toBe('color(display-p3 0.917488 0.200287 0.138561)');
+        expect(colorspace.toCSS('rec2100-pq', [0.580689, 0.580689, 0.580689], 0.5)).toBe(
+            'color(rec2100-pq 0.580689 0.580689 0.580689 / 0.5)',
+        );
+    });
 });
