@@ -1,5 +1,6 @@
 export * as color from './color';
 export * as colorspace from './colorspace';
+export * as gamut from './gamut';
 export * as hsl from './hsl';
 export * as okhsl from './okhsl';
 export * as okhsv from './okhsv';
