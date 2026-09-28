@@ -20,6 +20,7 @@ pnpm bench --no-save      # run without saving
 ## Layout
 
 - `core/`, `noise/` — micro benches of individual functions in tight loops (`@core`, `@noise`)
+- `color/` — color space conversions, perceptual mixing against linear blending, color difference, gamut mapping, tone mapping, texel packing and CSS parsing (`@color`)
 - `algorithms/` — composite benches (`@algo`) that implement a complete minimal feature from
   navigation/collision-style libraries, exercising many math functions together: funnel string
   pulling (`@nav`), frustum culling (`@culling`), closest-hit raycasting (`@raycast`), transform
