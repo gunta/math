@@ -3,9 +3,12 @@ import { linearToSrgb, srgbToLinear } from './colorspace';
 
 export * from './parse';
 
-/** A linear-sRGB color: [r, g, b] floats in [0, 1]. */
+/**
+ * A linear-sRGB color: [r, g, b] floats, where [0, 1] is the sRGB gamut.
+ * Values are unbounded. Channels outside [0, 1] describe wide-gamut colors, and values
+ * above 1 are HDR, with 1.0 as reference white (203 cd/m², BT.2408).
+ */
 export type Color = [r: number, g: number, b: number];
-
 
 /** Accepted input types for creating or parsing a Color. */
 export type ColorInput =
