@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { color } from '../../../src/color';
+import { color, colorspace } from '../../../src/color';
 
 describe('color', () => {
     it('create / set / fromValues', () => {
@@ -57,6 +57,51 @@ describe('color', () => {
         expect(color.equals([0.1, 0.2, 0.3], [0.1, 0.2, 0.3])).toBe(true);
         expect(color.equals([0.1, 0.2, 0.3], [0.1, 0.2, 0.31])).toBe(false);
         expect(color.equals([0.1, 0.2, 0.3], [0.1, 0.2, 0.31], 0.02)).toBe(true);
+    });
+
+    it('carries an optional straight alpha', () => {
+        expect(color.fromValues(1, 0, 0, 0.5)).toEqual([1, 0, 0, 0.5]);
+        expect(color.clone([1, 0, 0, 0.5])).toEqual([1, 0, 0, 0.5]);
+        expect(color.toCSS([1, 0, 0, 0.5])).toBe('rgba(255, 0, 0, 0.5)');
+        // a missing alpha is opaque
+        expect(color.equals([1, 0, 0], [1, 0, 0, 1])).toBe(true);
+    });
+
+    it('interpolates premultiplied when alpha is present', () => {
+        // fading red out towards transparent blue stays red instead of turning purple
+        expect(color.lerp(color.create(), [1, 0, 0, 1], [0, 0, 1, 0], 0.5)).toEqual([1, 0, 0, 0.5]);
+        const p = color.premultiply(color.create(), [0.8, 0.4, 0.2, 0.5]);
+        expect(p).toEqual([0.4, 0.2, 0.1, 0.5]);
+        expect(color.unpremultiply(p, p)).toEqual([0.8, 0.4, 0.2, 0.5]);
+    });
+
+    it('composites source-over in linear light', () => {
+        // an opaque result stays a plain [r, g, b]
+        expect(color.over(color.create(), [1, 0, 0, 0.5], [0, 0, 1])).toEqual([0.5, 0, 0.5]);
+        expect(color.over(color.create(), [1, 0, 0, 0.5], [0, 0, 1, 0.5])).toEqual([
+            expect.closeTo(2 / 3, 12),
+            0,
+            expect.closeTo(1 / 3, 12),
+            0.75,
+        ]);
+    });
+
+    it('converts whole buffers with any color function', () => {
+        // rgba pixels: rgb is converted, alpha is carried across
+        const pixels = new Float32Array([1, 1, 1, 0.5, 0, 0, 0, 1]);
+        const xyz = color.convertBuffer(new Float32Array(8), pixels, colorspace.linearSrgbToXyzD65, 4);
+        expect(Array.from(xyz)).toEqual([
+            expect.closeTo(0.9505, 4),
+            expect.closeTo(1, 6),
+            expect.closeTo(1.089, 3),
+            0.5,
+            0,
+            0,
+            0,
+            1,
+        ]);
+        // colors can be read from and written to buffers one at a time too
+        expect(color.fromBuffer(color.create(), pixels, 4)).toEqual([0, 0, 0]);
     });
 
     it('luminance uses Rec.709 weights on linear light', () => {

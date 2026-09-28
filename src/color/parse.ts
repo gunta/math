@@ -169,6 +169,7 @@ export function setFromColorInput(out: Color, input: ColorInput): Color {
     out[0] = parsed[0];
     out[1] = parsed[1];
     out[2] = parsed[2];
+    if (parsed.length > 3 || out.length > 3) out[3] = parsed[3] ?? 1;
     return out;
 }
 
@@ -178,9 +179,9 @@ export function fromColorInput(input: ColorInput): Color | null {
 }
 
 function parse(input: ColorInput): Color | null {
-    // [r, g, b] array, treated as already-linear
-    if (Array.isArray(input)) {
-        return [input[0] ?? 0, input[1] ?? 0, input[2] ?? 0];
+    // [r, g, b] or [r, g, b, a] array, treated as already-linear
+    if (typeof input === 'object') {
+        return input.length > 3 ? [input[0], input[1], input[2], input[3] ?? 1] : [input[0], input[1], input[2]];
     }
 
     // integer 0xRRGGBB (sRGB gamma)
