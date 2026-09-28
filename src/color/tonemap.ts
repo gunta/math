@@ -133,17 +133,18 @@ export function mixHeadroom(
     const ag = a[1];
     const ab = a[2];
     // absolute XYZ of b, then of a, reusing `out` as the only storage
+    // negative XYZ only comes from imaginary colors, it counts as 0 so the powers stay real
     linearSrgbToXyzD65(out, b);
-    const bx = out[0] * 203 + 0.001;
-    const by = out[1] * 203 + 0.001;
-    const bz = out[2] * 203 + 0.001;
+    const bx = Math.max(out[0], 0) * 203 + 0.001;
+    const by = Math.max(out[1], 0) * 203 + 0.001;
+    const bz = Math.max(out[2], 0) * 203 + 0.001;
     out[0] = ar;
     out[1] = ag;
     out[2] = ab;
     linearSrgbToXyzD65(out, out);
-    out[0] = ((out[0] * 203 + 0.001) ** (1 - t) * bx ** t - 0.001) / 203;
-    out[1] = ((out[1] * 203 + 0.001) ** (1 - t) * by ** t - 0.001) / 203;
-    out[2] = ((out[2] * 203 + 0.001) ** (1 - t) * bz ** t - 0.001) / 203;
+    out[0] = ((Math.max(out[0], 0) * 203 + 0.001) ** (1 - t) * bx ** t - 0.001) / 203;
+    out[1] = ((Math.max(out[1], 0) * 203 + 0.001) ** (1 - t) * by ** t - 0.001) / 203;
+    out[2] = ((Math.max(out[2], 0) * 203 + 0.001) ** (1 - t) * bz ** t - 0.001) / 203;
     return xyzD65ToLinearSrgb(out, out);
 }
 

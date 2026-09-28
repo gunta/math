@@ -50,4 +50,9 @@ describe('gamut', () => {
         // without headroom it is brighter than white, so it becomes white
         expect(gamut.mapToRec2020(color.create(), hdr)).toEqual([1, 1, 1]);
     });
+
+    it('treats NaN as 0 and infinity as peak, the same in every gamut', () => {
+        expect(gamut.mapToSrgb(color.create(), [Number.POSITIVE_INFINITY, 0, Number.NaN])).toEqual([1, 0, 0]);
+        expect(gamut.mapToDisplayP3(color.create(), [Number.POSITIVE_INFINITY, 0, Number.NaN])).toEqual([1, 0, 0]);
+    });
 });

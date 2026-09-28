@@ -101,7 +101,8 @@ export function mix(out: Color, a: Const<Color>, b: Const<Color>, t: number): Co
     const bB = lab[2] * ba;
     fromColor(lab, set(lab, a0, a1, a2));
     const alpha = aa + (ba - aa) * t;
-    const inv = alpha === 0 ? 0 : 1 / alpha;
+    // a transparent result keeps its premultiplied values (CSS Color 4)
+    const inv = alpha === 0 ? 1 : 1 / alpha;
     lab[0] = (lab[0] * aa + (bl - lab[0] * aa) * t) * inv;
     lab[1] = (lab[1] * aa + (bA - lab[1] * aa) * t) * inv;
     lab[2] = (lab[2] * aa + (bB - lab[2] * aa) * t) * inv;

@@ -53,4 +53,15 @@ describe('hsl', () => {
         expect(out[1]).toBe(1); // 0.5 + 0.8 clamped
         expect(out[2]).toBe(0); // 0.5 - 1 clamped
     });
+
+    it('round-trips colors outside sRGB without negative saturation', () => {
+        // Display P3 green: CSS Color 4 turns the hue around rather than going negative
+        const p3Green: color.Color = [-0.224940176, 1.042056955, -0.078636046];
+        const h = hsl.fromColor(hsl.create(), p3Green);
+        expect(h[1]).toBeGreaterThan(1);
+        const back = hsl.toColor(color.create(), h);
+        expect(back[0]).toBeCloseTo(p3Green[0], 9);
+        expect(back[1]).toBeCloseTo(p3Green[1], 9);
+        expect(back[2]).toBeCloseTo(p3Green[2], 9);
+    });
 });

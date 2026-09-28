@@ -55,20 +55,17 @@ export function isInRec2020(c: Const<Color>, peak = 1, epsilon = 0.000075): bool
 
 /** Clamp linear Color `c` into the sRGB gamut [0, peak] into `out`, per channel. Returns `out`. */
 export function clipToSrgb(out: Color, c: Const<Color>, peak = 1): Color {
-    out[0] = c[0];
-    out[1] = c[1];
-    out[2] = c[2];
-    return clip(out, 0, peak);
+    return clip(finite(out, c, peak), 0, peak);
 }
 
 /** Clamp linear Color `c` into the Display P3 gamut [0, peak] into `out`, per P3 channel. Returns `out`. */
 export function clipToDisplayP3(out: Color, c: Const<Color>, peak = 1): Color {
-    return clip(linearSrgbToLinearDisplayP3(out, c), 1, peak);
+    return clip(linearSrgbToLinearDisplayP3(out, finite(out, c, peak)), 1, peak);
 }
 
 /** Clamp linear Color `c` into the Rec.2020 gamut [0, peak] into `out`, per Rec.2020 channel. Returns `out`. */
 export function clipToRec2020(out: Color, c: Const<Color>, peak = 1): Color {
-    return clip(linearSrgbToLinearRec2020(out, c), 2, peak);
+    return clip(linearSrgbToLinearRec2020(out, finite(out, c, peak)), 2, peak);
 }
 
 /**
@@ -120,13 +117,23 @@ function fromTarget(out: Color, target: number): Color {
     return out;
 }
 
-function map(out: Color, c: Const<Color>, target: number, peak: number): Color {
+// copy `c` into `out` with NaN channels as 0 and infinite ones at the ends of [0, peak], so
+// non-finite input lands on the same color in every gamut
+function finite(out: Color, c: Const<Color>, peak: number): Color {
     const r = c[0];
     const g = c[1];
     const b = c[2];
-    out[0] = r;
-    out[1] = g;
-    out[2] = b;
+    out[0] = r - r === 0 ? r : r > 0 ? peak : 0;
+    out[1] = g - g === 0 ? g : g > 0 ? peak : 0;
+    out[2] = b - b === 0 ? b : b > 0 ? peak : 0;
+    return out;
+}
+
+function map(out: Color, c: Const<Color>, target: number, peak: number): Color {
+    finite(out, c, peak);
+    const r = out[0];
+    const g = out[1];
+    const b = out[2];
     toTarget(out, target);
     let x = out[0];
     let y = out[1];

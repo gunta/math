@@ -55,5 +55,8 @@ describe('tonemap', () => {
         expect(tonemap.mixHeadroom([0, 0, 0], sdr, 0, hdr, 2, -1)).toEqual(sdr);
         expect(tonemap.mixHeadroom([0, 0, 0], sdr, 0, hdr, 2, 3)).toEqual(hdr);
         expect(tonemap.mixHeadroom([0, 0, 0], sdr, 1, hdr, 1, 3)).toEqual(sdr);
+        // imaginary colors with negative XYZ still mix to finite values
+        const mixed = tonemap.mixHeadroom([0, 0, 0], [-0.5, 1, -0.3], 0, hdr, 2, 1);
+        expect(mixed.every(Number.isFinite)).toBe(true);
     });
 });

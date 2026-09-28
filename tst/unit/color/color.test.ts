@@ -42,8 +42,9 @@ describe('color', () => {
 
     it('toCSS clamps and gamma-encodes', () => {
         expect(color.toCSS([1, 0, 0])).toBe('rgb(255, 0, 0)');
-        // out-of-range channels are clamped, not wrapped
+        // out-of-range channels are clamped, not wrapped, and NaN is 0
         expect(color.toCSS([2, -1, 0])).toBe('rgb(255, 0, 0)');
+        expect(color.toCSS([Number.NaN, 0, 0])).toBe('rgb(0, 0, 0)');
     });
 
     it('arithmetic + blending', () => {
@@ -73,6 +74,8 @@ describe('color', () => {
         const p = color.premultiply(color.create(), [0.8, 0.4, 0.2, 0.5]);
         expect(p).toEqual([0.4, 0.2, 0.1, 0.5]);
         expect(color.unpremultiply(p, p)).toEqual([0.8, 0.4, 0.2, 0.5]);
+        // a fully transparent result keeps its premultiplied values, as CSS does
+        expect(color.lerp(color.create(), [1, 0, 0, 0], [0, 0, 1, 1], 0)).toEqual([0, 0, 0, 0]);
     });
 
     it('composites source-over in linear light', () => {

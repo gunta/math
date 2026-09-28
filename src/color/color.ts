@@ -190,22 +190,20 @@ export function multiplyScalar(out: Color, a: Const<Color>, s: number): Color {
 /**
  * Linearly interpolate from `a` to `b` by `t` into `out` (physically-correct blend). Returns `out`.
  * When either color has alpha, channels are interpolated premultiplied, as CSS Color 4 specifies,
- * so a transparent endpoint does not bleed its color into the blend.
+ * so a transparent endpoint does not bleed its color into the blend. A fully transparent result
+ * keeps its premultiplied values, also as CSS specifies.
  */
 export function lerp(out: Color, a: Const<Color>, b: Const<Color>, t: number): Color {
     if (a.length > 3 || b.length > 3 || out.length > 3) {
         const aa = a[3] ?? 1;
         const ba = b[3] ?? 1;
         const alpha = aa + (ba - aa) * t;
-        if (alpha !== 0) {
-            const inv = 1 / alpha;
-            out[0] = (a[0] * aa + (b[0] * ba - a[0] * aa) * t) * inv;
-            out[1] = (a[1] * aa + (b[1] * ba - a[1] * aa) * t) * inv;
-            out[2] = (a[2] * aa + (b[2] * ba - a[2] * aa) * t) * inv;
-            out[3] = alpha;
-            return out;
-        }
-        out[3] = 0;
+        const inv = alpha === 0 ? 1 : 1 / alpha;
+        out[0] = (a[0] * aa + (b[0] * ba - a[0] * aa) * t) * inv;
+        out[1] = (a[1] * aa + (b[1] * ba - a[1] * aa) * t) * inv;
+        out[2] = (a[2] * aa + (b[2] * ba - a[2] * aa) * t) * inv;
+        out[3] = alpha;
+        return out;
     }
     out[0] = a[0] + (b[0] - a[0]) * t;
     out[1] = a[1] + (b[1] - a[1]) * t;
@@ -223,10 +221,10 @@ export function premultiply(out: Color, c: Const<Color>): Color {
     return out;
 }
 
-/** Divide premultiplied r, g, b by alpha into `out` (straight alpha), keeping alpha. Transparent stays black. Returns `out`. */
+/** Divide premultiplied r, g, b by alpha into `out` (straight alpha), keeping alpha. At alpha 0 the values are kept, as CSS does. Returns `out`. */
 export function unpremultiply(out: Color, c: Const<Color>): Color {
     const a = c[3] ?? 1;
-    const inv = a === 0 ? 0 : 1 / a;
+    const inv = a === 0 ? 1 : 1 / a;
     out[0] = c[0] * inv;
     out[1] = c[1] * inv;
     out[2] = c[2] * inv;
@@ -242,7 +240,7 @@ export function over(out: Color, src: Const<Color>, dst: Const<Color>): Color {
     const sa = src[3] ?? 1;
     const da = (dst[3] ?? 1) * (1 - sa);
     const a = sa + da;
-    const inv = a === 0 ? 0 : 1 / a;
+    const inv = a === 0 ? 1 : 1 / a;
     out[0] = (src[0] * sa + dst[0] * da) * inv;
     out[1] = (src[1] * sa + dst[1] * da) * inv;
     out[2] = (src[2] * sa + dst[2] * da) * inv;
@@ -299,7 +297,8 @@ function clamp01(x: number): number {
     return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 
-/** linear channel -> clamped sRGB byte [0, 255]. */
+/** linear channel -> clamped sRGB byte [0, 255], with NaN as 0. */
 function to255(c: number): number {
-    return Math.max(0, Math.min(255, Math.round(linearToSrgb(c) * 255)));
+    const v = Math.round(linearToSrgb(c) * 255);
+    return v > 0 ? (v < 255 ? v : 255) : 0;
 }

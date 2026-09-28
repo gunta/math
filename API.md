@@ -1473,7 +1473,7 @@ import { color } from 'math/color';
 - `color.multiplyScalar(out: Color, a: Const<Color>, s: number): Color` — Scale each channel of `a` by `s` into `out` (brightness). Returns `out`.
 - `color.lerp(out: Color, a: Const<Color>, b: Const<Color>, t: number): Color` — Linearly interpolate from `a` to `b` by `t` into `out` (physically-correct blend). Returns `out`.
 - `color.premultiply(out: Color, c: Const<Color>): Color` — Multiply r, g, b by alpha into `out` (premultiplied alpha), keeping alpha. Returns `out`.
-- `color.unpremultiply(out: Color, c: Const<Color>): Color` — Divide premultiplied r, g, b by alpha into `out` (straight alpha), keeping alpha. Transparent stays black. Returns `out`.
+- `color.unpremultiply(out: Color, c: Const<Color>): Color` — Divide premultiplied r, g, b by alpha into `out` (straight alpha), keeping alpha. At alpha 0 the values are kept, as CSS does. Returns `out`.
 - `color.over(out: Color, src: Const<Color>, dst: Const<Color>): Color` — Composite `src` over `dst` into `out` (Porter-Duff source-over, straight alpha, in linear light).
 - `color.clamp(out: Color, c: Const<Color>): Color` — Clamp each channel of `c` to [0, 1] into `out`. Returns `out`.
 - `color.contrastColor(out: Color, background: Const<Color>): Color` — Write white or black into `out`, whichever contrasts more with `background` (CSS contrast-color()). Returns `out`.

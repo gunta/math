@@ -5,7 +5,6 @@ import { linearToSrgb, srgbToLinear } from './colorspace';
 /** A hue-saturation-lightness color: [h, s, l], all in [0, 1] (hue wraps). */
 export type HSL = [hue: number, saturation: number, lightness: number];
 
-
 /** Create a new HSL initialized to [0, 0, 0] (black). */
 export function create(): HSL {
     return [0, 0, 0];
@@ -52,12 +51,18 @@ export function fromColor(out: HSL, c: Const<Color>): HSL {
     let s = 0;
     if (max !== min) {
         const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        s = l === 0 || l === 1 ? 0 : (max - l) / Math.min(l, 1 - l);
         if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
         else if (max === g) h = (b - r) / d + 2;
         else h = (r - g) / d + 4;
         h /= 6;
     }
+    // colors far outside sRGB give a negative saturation, point the hue the other way instead (CSS Color 4)
+    if (s < 0) {
+        h += 0.5;
+        s = -s;
+    }
+    if (h >= 1) h -= 1;
 
     out[0] = h;
     out[1] = s;
@@ -65,25 +70,19 @@ export function fromColor(out: HSL, c: Const<Color>): HSL {
     return out;
 }
 
-/** Write the linear Color of an HSL into `out`. Returns `out`. */
+/**
+ * Write the linear Color of an HSL into `out`. Returns `out`.
+ * Uses the CSS Color 4 formula, which also holds for saturation and lightness outside [0, 1].
+ */
 export function toColor(out: Color, a: Const<HSL>): Color {
-    const h = a[0];
-    const s = a[1];
+    // hue in twelfths of a turn, wrapped into [0, 12)
+    let h = a[0] * 12;
+    h -= 12 * Math.floor(h / 12);
     const l = a[2];
-
-    if (s === 0) {
-        const v = srgbToLinear(l);
-        out[0] = v;
-        out[1] = v;
-        out[2] = v;
-        return out;
-    }
-
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    out[0] = srgbToLinear(hue(p, q, h + 1 / 3));
-    out[1] = srgbToLinear(hue(p, q, h));
-    out[2] = srgbToLinear(hue(p, q, h - 1 / 3));
+    const k = a[1] * Math.min(l, 1 - l);
+    out[0] = srgbToLinear(l - k * channel(h));
+    out[1] = srgbToLinear(l - k * channel(h + 8));
+    out[2] = srgbToLinear(l - k * channel(h + 4));
     return out;
 }
 
@@ -123,11 +122,8 @@ function clamp01(x: number): number {
     return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 
-function hue(p: number, q: number, t: number): number {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
+// the CSS Color 4 hsl channel ramp for a hue offset in twelfths of a turn
+function channel(n: number): number {
+    const k = n < 12 ? n : n - 12;
+    return Math.max(-1, Math.min(k - 3, 9 - k, 1));
 }

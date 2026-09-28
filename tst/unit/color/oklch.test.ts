@@ -49,5 +49,7 @@ describe('oklch', () => {
     it('serializes to CSS', () => {
         expect(oklch.toCSS([0.627955, 0.257683, 29.2339])).toBe('oklch(0.62796 0.25768 29.234)');
         expect(oklch.toCSS([0.7, 0.1, 200], 0.5)).toBe('oklch(0.7 0.1 200 / 0.5)');
+        // a NaN channel is a missing component
+        expect(oklch.toCSS([0.7, 0, Number.NaN])).toBe('oklch(0.7 0 none)');
     });
 });

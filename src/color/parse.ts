@@ -211,14 +211,15 @@ function parse(input: ColorInput): Color | null {
         ];
     }
     const toks = tokenize(input.trim().toLowerCase());
-    const p: Parser = { toks: toks ?? [], i: 0, angle: false, kw: null };
+    const p: Parser = { toks: toks ?? [], i: 0, type: 0, depth: 0, kw: null };
     const c = toks === null ? null : parseColor(p);
-    if (c === null || p.i !== p.toks.length) {
+    const out = c === null || p.i !== p.toks.length ? null : toLinear(c.space, c.ch);
+    // colors that overflow to infinity or NaN on conversion are rejected too
+    if (out === null || !Number.isFinite(out[0] + out[1] + out[2])) {
         console.warn(`[math] color: unrecognised color input: "${input}"`);
         return null;
     }
-    const out = toLinear(c.space, c.ch);
-    const alpha = !Number.isNaN(c.alpha) ? c.alpha : 0;
+    const alpha = c !== null && !Number.isNaN(c.alpha) ? c.alpha : 0;
     if (alpha !== 1) out[3] = alpha;
     return out;
 }
@@ -291,8 +292,9 @@ function tokenize(s: string): Token[] | null {
 // a parsed color in the channels of its own space, NaN marks a missing (`none`) component
 type Parsed = { space: string; ch: [number, number, number]; alpha: number };
 
-// angle is the type of the value parsed last, kw holds the channel keywords of a relative color
-type Parser = { toks: Token[]; i: number; angle: boolean; kw: Map<string, number> | null };
+// type is the type of the value parsed last (NUM, PCT or ANG), depth guards against deep nesting,
+// and kw holds the channel keywords of a relative color
+type Parser = { toks: Token[]; i: number; type: number; depth: number; kw: Map<string, number> | null };
 
 // Per space: channel keywords, percent reference of each channel (NaN when % is invalid), the hue
 // channel (-1 for none), analogous component categories for missing components (r, g, b, L lightness,
@@ -339,7 +341,7 @@ function eat(p: Parser, t: string, s?: string): boolean {
 
 function parseColor(p: Parser): Parsed | null {
     const t = p.toks[p.i++];
-    if (t === undefined) return null;
+    if (t === undefined || p.depth > 32) return null;
     if (t.t === 'hash') return parseHex(t.s);
     if (t.t === 'id') {
         if (t.s === 'transparent') return { space: 'srgb', ch: [0, 0, 0], alpha: 0 };
@@ -350,6 +352,7 @@ function parseColor(p: Parser): Parsed | null {
     }
     if (t.t !== 'fn') return null;
     let c: Parsed | null = null;
+    p.depth++;
     switch (t.s) {
         case 'rgb':
         case 'rgba':
@@ -382,6 +385,7 @@ function parseColor(p: Parser): Parsed | null {
             c = parseContrast(p);
             break;
     }
+    p.depth--;
     return c !== null && eat(p, ')') ? c : null;
 }
 
@@ -421,6 +425,7 @@ function parseFunction(p: Parser, space: string, scale: number, legacy: boolean)
     }
 
     const ch: [number, number, number] = [0, 0, 0];
+    const types = [NUM, NUM, NUM];
     let commas = false;
     for (let k = 0; k < 3; k++) {
         if (k === 1 && legacy && origin === null) commas = eat(p, ',');
@@ -428,21 +433,31 @@ function parseFunction(p: Parser, space: string, scale: number, legacy: boolean)
         const v = parseChannel(p, info.pct[k] * scale, k === info.hue);
         if (v === null) return null;
         ch[k] = v / scale;
+        types[k] = p.type;
     }
     if (commas ? eat(p, ',') : eat(p, '/')) {
         const a = parseChannel(p, 1, false);
-        if (a === null) return null;
+        if (a === null || (commas && Number.isNaN(a))) return null;
         alpha = a;
     }
     p.kw = outer;
 
-    // parsed-value clamping from CSS Color 4: rgb() channels, negative hsl() saturation, lab and
-    // oklab lightness and negative chroma. Relative colors keep their gamut
-    if (space === 'srgb' && origin === null) for (let k = 0; k < 3; k++) ch[k] = clamp(ch[k], 0, 1);
+    // the legacy comma syntax has no `none`, takes rgb() channels all as numbers or all as
+    // percentages, and hsl() saturation and lightness only as percentages
+    if (commas) {
+        if (Number.isNaN(ch[0] + ch[1] + ch[2])) return null;
+        if (scale === 255 ? types[0] !== types[1] || types[1] !== types[2] : types[1] !== PCT || types[2] !== PCT) return null;
+    }
+
+    // parsed-value clamping from CSS Color 4: rgb() channels (not color(srgb ...)), negative hsl()
+    // saturation, lab and oklab lightness, negative chroma and alpha. Relative colors keep their gamut
+    if (scale === 255 && origin === null) for (let k = 0; k < 3; k++) ch[k] = clamp(ch[k], 0, 1);
     else if (space === 'hsl' && origin === null) ch[1] = clamp(ch[1], 0, Number.POSITIVE_INFINITY);
     else if (space === 'lab' || space === 'lch') ch[0] = clamp(ch[0], 0, 100);
     else if (space === 'oklab' || space === 'oklch') ch[0] = clamp(ch[0], 0, 1);
     if (info.cat === 'LCH') ch[1] = clamp(ch[1], 0, Number.POSITIVE_INFINITY);
+    // infinities that no clamp brought back, like an infinite hue, have no color
+    for (let k = 0; k < 3; k++) if (ch[k] === Number.POSITIVE_INFINITY || ch[k] === Number.NEGATIVE_INFINITY) return null;
     return { space, ch, alpha: clamp(alpha, 0, 1) };
 }
 
@@ -500,16 +515,17 @@ function parseMix(p: Parser): Parsed | null {
     const weights: number[] = [];
     do {
         let w = Number.NaN;
-        if (peek(p, 'pct')) w = p.toks[p.i++].v / 100;
+        if (peek(p, 'pct')) w = p.toks[p.i++].v;
         const c = parseColor(p);
         if (c === null) return null;
-        if (Number.isNaN(w) && peek(p, 'pct')) w = p.toks[p.i++].v / 100;
-        if (w < 0 || w > 1) return null;
+        if (Number.isNaN(w) && peek(p, 'pct')) w = p.toks[p.i++].v;
+        if (w < 0 || w > 100) return null;
         colors.push(toSpace(c, space));
         weights.push(w);
     } while (eat(p, ','));
 
-    // normalize mix percentages (css-values-5), forcing them to sum to 1
+    // normalize mix percentages (css-values-5): omitted ones share what is left of 100%, and a
+    // total under 100% leaves the rest transparent. Sums within float noise of 100% count as 100%
     let specified = 0;
     let omitted = 0;
     for (const w of weights) {
@@ -518,10 +534,10 @@ function parseMix(p: Parser): Parsed | null {
     }
     let total = 0;
     for (let k = 0; k < weights.length; k++) {
-        if (Number.isNaN(weights[k])) weights[k] = (1 - Math.min(specified, 1)) / omitted;
+        if (Number.isNaN(weights[k])) weights[k] = (100 - Math.min(specified, 100)) / omitted;
         total += weights[k];
     }
-    const alphaMult = total < 1 ? total : 1;
+    const alphaMult = total < 100 - 1e-9 ? total / 100 : 1;
 
     // fold the colors in order, each step interpolating by the next color's share
     let acc = colors[0];
@@ -557,6 +573,7 @@ function interpolate(a: Parsed, b: Parsed, t: number, space: string, hue: HueInt
         if (Number.isNaN(y)) y = x;
         if (Number.isNaN(x) || k === h) ch[k] = Number.isNaN(x) ? Number.NaN : lerpHue(x, y, t, hue);
         else {
+            // a transparent result keeps its premultiplied values (CSS Color 4)
             const v = x * aa + (y * ba - x * aa) * t;
             ch[k] = alpha === 0 ? v : v / alpha;
         }
@@ -575,7 +592,8 @@ function toSpace(c: Parsed, space: string): Parsed {
         const j = from[k] === '-' ? -1 : to.cat.indexOf(from[k]);
         if (Number.isNaN(c.ch[k]) && j >= 0) ch[j] = Number.NaN;
     }
-    if (to.hue >= 0 && (space === 'hwb' ? ch[1] + ch[2] >= 100 : ch[1] <= to.eps)) ch[to.hue] = Number.NaN;
+    // whiteness and blackness of converted grays can sum to a hair under 100%
+    if (to.hue >= 0 && (space === 'hwb' ? ch[1] + ch[2] >= 100 - 1e-6 : ch[1] <= to.eps)) ch[to.hue] = Number.NaN;
     return { space, ch, alpha: c.alpha };
 }
 
@@ -588,89 +606,118 @@ function convert(c: Parsed, space: string): [number, number, number] {
 
 /* channel values and calc() */
 
-// a channel: `none` (NaN), a number, percentage, angle, relative keyword, constant or math function
+// value types, percentages are resolved to numbers but remembered for the legacy syntax rules
+const NUM = 0;
+const PCT = 1;
+const ANG = 2;
+
+// a channel: `none` (NaN), a number, percentage, angle, relative keyword, constant or math function.
+// A NaN from calc() becomes 0 and only `none` is missing, as CSS Values specifies
 function parseChannel(p: Parser, pct: number, isHue: boolean): number | null {
-    if (eat(p, 'id', 'none')) return Number.NaN;
+    if (eat(p, 'id', 'none')) {
+        p.type = NUM;
+        return Number.NaN;
+    }
+    // parentheses only group inside a math function
+    if (peek(p, '(')) return null;
     const v = parseValue(p, pct);
     // hues take angles and plain numbers (degrees), other channels only numbers and percentages
-    return v === null || (p.angle && !isHue) ? null : v;
+    if (v === null || (p.type === ANG && !isHue)) return null;
+    return Number.isNaN(v) ? 0 : v;
+}
+
+// the type of a + b or a - b: angles only combine with angles
+function sumType(a: number, b: number): number {
+    if ((a === ANG) !== (b === ANG)) return -1;
+    return a === b ? a : NUM;
 }
 
 function parseSum(p: Parser, pct: number): number | null {
     let v = parseProduct(p, pct);
-    let angle = p.angle;
+    let type = p.type;
     while (v !== null && (peek(p, '+') || peek(p, '-'))) {
         const add = p.toks[p.i++].t === '+';
         const r = parseProduct(p, pct);
         if (r === null) return null;
+        type = sumType(type, p.type);
+        if (type < 0) return null;
         v = add ? v + r : v - r;
-        angle = angle || p.angle;
     }
-    p.angle = angle;
+    p.type = type;
     return v;
 }
 
 function parseProduct(p: Parser, pct: number): number | null {
     let v = parseValue(p, pct);
-    let angle = p.angle;
+    let type = p.type;
     while (v !== null && (peek(p, '*') || peek(p, '/'))) {
         const mul = p.toks[p.i++].t === '*';
         const r = parseValue(p, pct);
         if (r === null) return null;
-        v = mul ? v * r : v / r;
-        angle = mul ? angle || p.angle : angle && !p.angle;
+        const rt = p.type;
+        if (mul) {
+            // at most one angle, and the product keeps the other factor's type
+            if (type === ANG && rt === ANG) return null;
+            type = type === ANG || rt === ANG ? ANG : type === PCT || rt === PCT ? PCT : NUM;
+            v *= r;
+        } else {
+            // dividing by an angle only works for an angle, where the units cancel
+            if (rt === ANG && type !== ANG) return null;
+            type = type === ANG ? (rt === ANG ? NUM : ANG) : type === PCT && rt !== PCT ? PCT : NUM;
+            v /= r;
+        }
     }
-    p.angle = angle;
+    p.type = type;
     return v;
 }
 
 function parseValue(p: Parser, pct: number): number | null {
     const t = p.toks[p.i++];
-    p.angle = false;
+    p.type = NUM;
     if (t === undefined) return null;
     switch (t.t) {
         case 'num':
             return t.v;
         case 'pct':
             // percentages are invalid where the channel has no percent reference (hue)
+            p.type = PCT;
             return Number.isNaN(pct) ? null : (t.v / 100) * pct;
         case 'dim': {
             // angles as degrees
             const unit = t.s === 'deg' ? 1 : t.s === 'rad' ? 180 / Math.PI : t.s === 'grad' ? 0.9 : t.s === 'turn' ? 360 : 0;
-            p.angle = true;
+            p.type = ANG;
             return unit === 0 ? null : t.v * unit;
         }
         case '(': {
+            if (++p.depth > 32) return null;
             const v = parseSum(p, pct);
+            p.depth--;
             return v !== null && eat(p, ')') ? v : null;
         }
         case 'id':
             return parseKeyword(p, t.s);
-        case 'fn':
-            return parseMath(p, t.s, pct);
+        case 'fn': {
+            if (++p.depth > 32) return null;
+            const v = parseMath(p, t.s, pct);
+            p.depth--;
+            return v;
+        }
     }
     return null;
 }
 
 // relative color channel keywords (numbers) and the calc() constants
 function parseKeyword(p: Parser, s: string): number | null {
-    const negative = s[0] === '-';
-    if (negative) s = s.slice(1);
-    const v =
-        p.kw?.get(s) ??
-        (s === 'e'
-            ? Math.E
-            : s === 'pi'
-              ? Math.PI
-              : s === 'infinity'
-                ? Number.POSITIVE_INFINITY
-                : s === 'nan'
-                  ? Number.NaN
-                  : null);
-    return v === null ? null : negative ? -v : v;
+    if (s === 'e') return Math.E;
+    if (s === 'pi') return Math.PI;
+    if (s === 'infinity') return Number.POSITIVE_INFINITY;
+    if (s === '-infinity') return Number.NEGATIVE_INFINITY;
+    if (s === 'nan') return Number.NaN;
+    return p.kw?.get(s) ?? null;
 }
 
-// calc() and the CSS math functions, trig takes angles or radians and inverse trig returns angles
+// calc() and the CSS math functions. Trig takes angles or radians, inverse trig returns angles,
+// and arguments that are compared or combined must agree on being angles
 function parseMath(p: Parser, name: string, pct: number): number | null {
     let strategy = 'nearest';
     if (name === 'round' && peek(p, 'id') && /^(nearest|up|down|to-zero)$/.test(p.toks[p.i].s)) {
@@ -678,29 +725,46 @@ function parseMath(p: Parser, name: string, pct: number): number | null {
         if (!eat(p, ',')) return null;
     }
     const args: number[] = [];
-    let angle = false;
+    let type = NUM;
+    let angles = 0;
+    let percents = 0;
     do {
         const v = parseSum(p, pct);
         if (v === null) return null;
-        if (args.length === 0) angle = p.angle;
+        if (args.length === 0) type = p.type;
+        if (p.type === ANG) angles++;
+        else if (p.type === PCT) percents++;
         args.push(v);
     } while (eat(p, ','));
     if (!eat(p, ')')) return null;
-    const a = args[0];
-    const b = args.length > 1 ? args[1] : 1;
     const n = args.length;
-    const rad = angle ? Math.PI / 180 : 1;
-    p.angle = angle;
+    const a = args[0];
+    const b = n > 1 ? args[1] : 1;
+    // variadic and comparison functions need all angles or no angles, and keep that type
+    const same = angles === 0 || angles === n;
+    const kept = angles === n ? ANG : percents === n ? PCT : NUM;
+    p.type = kept;
     switch (name) {
         case 'calc':
+            p.type = type;
             return n === 1 ? a : null;
         case 'min':
-            return Math.min(...args);
         case 'max':
-            return Math.max(...args);
+        case 'hypot': {
+            if (!same) return null;
+            let v = name === 'hypot' ? 0 : a;
+            for (let k = 0; k < n; k++) {
+                const x = args[k];
+                if (name === 'min') v = x < v || Number.isNaN(x) ? x : v;
+                else if (name === 'max') v = x > v || Number.isNaN(x) ? x : v;
+                else v += x * x;
+            }
+            return name === 'hypot' ? Math.sqrt(v) : v;
+        }
         case 'clamp':
-            return n === 3 ? Math.max(a, Math.min(b, args[2])) : null;
+            return n === 3 && same ? Math.max(a, Math.min(b, args[2])) : null;
         case 'round': {
+            if (n > 2 || !same) return null;
             const q = a / b;
             const r =
                 strategy === 'up'
@@ -713,24 +777,32 @@ function parseMath(p: Parser, name: string, pct: number): number | null {
             return r * b;
         }
         case 'mod':
-            return n === 2 ? a - b * Math.floor(a / b) : null;
+            return n === 2 && same ? a - b * Math.floor(a / b) : null;
         case 'rem':
-            return n === 2 ? a - b * Math.trunc(a / b) : null;
+            return n === 2 && same ? a - b * Math.trunc(a / b) : null;
         case 'abs':
-            return Math.abs(a);
-        case 'hypot':
-            return Math.hypot(...args);
-    }
-    p.angle = false;
-    switch (name) {
+            p.type = type;
+            return n === 1 ? Math.abs(a) : null;
         case 'sign':
-            return Math.sign(a);
+            p.type = NUM;
+            return n === 1 ? Math.sign(a) : null;
+    }
+    p.type = NUM;
+    if (n > 2 || (n === 2 && name !== 'pow' && name !== 'log' && name !== 'atan2')) return null;
+    switch (name) {
         case 'sin':
-            return Math.sin(a * rad);
+            return n === 1 ? Math.sin(type === ANG ? (a * Math.PI) / 180 : a) : null;
         case 'cos':
-            return Math.cos(a * rad);
+            return n === 1 ? Math.cos(type === ANG ? (a * Math.PI) / 180 : a) : null;
         case 'tan':
-            return Math.tan(a * rad);
+            return n === 1 ? Math.tan(type === ANG ? (a * Math.PI) / 180 : a) : null;
+        case 'atan2':
+            p.type = ANG;
+            return n === 2 && same ? (Math.atan2(a, b) * 180) / Math.PI : null;
+    }
+    // the rest take plain numbers
+    if (angles > 0) return null;
+    switch (name) {
         case 'pow':
             return n === 2 ? a ** b : null;
         case 'sqrt':
@@ -740,7 +812,7 @@ function parseMath(p: Parser, name: string, pct: number): number | null {
         case 'exp':
             return Math.exp(a);
     }
-    p.angle = true;
+    p.type = ANG;
     switch (name) {
         case 'asin':
             return (Math.asin(a) * 180) / Math.PI;
@@ -748,8 +820,6 @@ function parseMath(p: Parser, name: string, pct: number): number | null {
             return (Math.acos(a) * 180) / Math.PI;
         case 'atan':
             return (Math.atan(a) * 180) / Math.PI;
-        case 'atan2':
-            return n === 2 ? (Math.atan2(a, b) * 180) / Math.PI : null;
     }
     return null;
 }

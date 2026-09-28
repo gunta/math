@@ -126,7 +126,8 @@ export function mix(out: Color, a: Const<Color>, b: Const<Color>, t: number, hue
     if (ac <= 0.000004) ah = bh;
     else if (bc <= 0.000004) bh = ah;
     const alpha = aa + (ba - aa) * t;
-    const inv = alpha === 0 ? 0 : 1 / alpha;
+    // a transparent result keeps its premultiplied values (CSS Color 4)
+    const inv = alpha === 0 ? 1 : 1 / alpha;
     // premultiply every channel except hue
     lch[0] = (al * aa + (bl * ba - al * aa) * t) * inv;
     lch[1] = (ac * aa + (bc * ba - ac * aa) * t) * inv;
