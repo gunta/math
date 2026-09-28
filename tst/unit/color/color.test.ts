@@ -17,6 +17,7 @@ describe('color', () => {
         expect(color.fromColorInput('#f00')).toEqual([1, 0, 0]);
         expect(color.fromColorInput(0xff0000)).toEqual([1, 0, 0]);
         expect(color.fromColorInput('red')).toEqual([1, 0, 0]);
+        expect(color.toHexString(color.fromColorInput('slategray') as color.Color)).toBe('708090');
         // an array input is treated as already-linear
         expect(color.fromColorInput([0.25, 0.5, 0.75])).toEqual([0.25, 0.5, 0.75]);
     });
