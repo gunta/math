@@ -193,7 +193,7 @@ export function multiplyScalar(out: Color, a: Const<Color>, s: number): Color {
  * so a transparent endpoint does not bleed its color into the blend.
  */
 export function lerp(out: Color, a: Const<Color>, b: Const<Color>, t: number): Color {
-    if (a.length > 3 || b.length > 3) {
+    if (a.length > 3 || b.length > 3 || out.length > 3) {
         const aa = a[3] ?? 1;
         const ba = b[3] ?? 1;
         const alpha = aa + (ba - aa) * t;
