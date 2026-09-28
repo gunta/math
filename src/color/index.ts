@@ -8,6 +8,7 @@ export * as okhsl from './okhsl';
 export * as okhsv from './okhsv';
 export * as oklab from './oklab';
 export * as oklch from './oklch';
+export * as tonemap from './tonemap';
 
 export type { Color, ColorInput } from './color';
 export type { HSL } from './hsl';
