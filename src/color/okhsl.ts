@@ -121,8 +121,8 @@ export function toColor(out: Color, a: Const<Okhsl>): Color {
 }
 
 /**
- * Interpolate from `a` to `b` by `t` into `out`, going around the hue circle by `hue`
- * (default 'shorter'). A gray endpoint takes the other endpoint's hue. Returns `out`.
+ * Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+ * A gray endpoint takes the other endpoint's hue.
  */
 export function lerp(out: Okhsl, a: Const<Okhsl>, b: Const<Okhsl>, t: number, hue: HueInterpolation = 'shorter'): Okhsl {
     const as = a[1];

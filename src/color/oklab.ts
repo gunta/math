@@ -84,8 +84,8 @@ export function lerp(out: Oklab, a: Const<Oklab>, b: Const<Oklab>, t: number): O
 }
 
 /**
- * Interpolate two linear Colors through OKLab by `t` into `out`, the perceptually even
- * gradient of CSS `color-mix(in oklab, ...)`. Alpha is interpolated premultiplied. Returns `out`.
+ * Interpolate two linear Colors through OKLab by `t` into `out`, like CSS `color-mix(in oklab, ...)`. Returns `out`.
+ * The perceptually even gradient. Alpha is interpolated premultiplied.
  */
 export function mix(out: Color, a: Const<Color>, b: Const<Color>, t: number): Color {
     const a0 = a[0];

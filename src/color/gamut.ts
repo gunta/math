@@ -72,24 +72,24 @@ export function clipToRec2020(out: Color, c: Const<Color>, peak = 1): Color {
 }
 
 /**
- * Map linear Color `c` into the sRGB gamut [0, peak] into `out`, keeping its OKLCH lightness and hue
- * (CSS Color 4 ray trace gamut mapping). Colors already in gamut are returned unchanged. Returns `out`.
+ * Map linear Color `c` into the sRGB gamut [0, peak] into `out`, keeping its OKLCH lightness and hue. Returns `out`.
+ * CSS Color 4 ray trace gamut mapping. Colors already in gamut are returned unchanged.
  */
 export function mapToSrgb(out: Color, c: Const<Color>, peak = 1): Color {
     return map(out, c, 0, peak);
 }
 
 /**
- * Map linear Color `c` into the Display P3 gamut [0, peak] into `out`, keeping its OKLCH lightness and hue
- * (CSS Color 4 ray trace gamut mapping). Colors already in gamut are returned unchanged. Returns `out`.
+ * Map linear Color `c` into the Display P3 gamut [0, peak] into `out`, keeping its OKLCH lightness and hue. Returns `out`.
+ * CSS Color 4 ray trace gamut mapping. Colors already in gamut are returned unchanged.
  */
 export function mapToDisplayP3(out: Color, c: Const<Color>, peak = 1): Color {
     return map(out, c, 1, peak);
 }
 
 /**
- * Map linear Color `c` into the Rec.2020 (Rec.2100) gamut [0, peak] into `out`, keeping its OKLCH lightness
- * and hue (CSS Color 4 ray trace gamut mapping). Colors already in gamut are returned unchanged. Returns `out`.
+ * Map linear Color `c` into the Rec.2020 (Rec.2100) gamut [0, peak] into `out`, keeping its OKLCH lightness and hue. Returns `out`.
+ * CSS Color 4 ray trace gamut mapping. Colors already in gamut are returned unchanged.
  */
 export function mapToRec2020(out: Color, c: Const<Color>, peak = 1): Color {
     return map(out, c, 2, peak);

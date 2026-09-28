@@ -87,13 +87,22 @@ function entrypoints() {
 const hasExport = (node) =>
   node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 
-// the top-level exported members (functions, consts, types) declared in a file, in source order
+// the top-level exported members (functions, consts, types) declared in a file, in source order,
+// including those it re-exports with `export * from './leaf'`
 function getExportedMembers(file) {
   const sf = tsProgram.getSourceFile(file);
   const out = [];
   if (!sf) return out;
   sf.forEachChild((node) => {
-    if (ts.isFunctionDeclaration(node) && node.name && hasExport(node)) {
+    if (
+      ts.isExportDeclaration(node) &&
+      !node.exportClause &&
+      !node.isTypeOnly &&
+      node.moduleSpecifier
+    ) {
+      const resolved = resolveSpecifier(file, node.moduleSpecifier.text);
+      if (resolved && !resolved.isDir) out.push(...getExportedMembers(resolved.file));
+    } else if (ts.isFunctionDeclaration(node) && node.name && hasExport(node)) {
       out.push({ name: node.name.text, kind: "value" });
     } else if (ts.isVariableStatement(node) && hasExport(node)) {
       for (const decl of node.declarationList.declarations) {
@@ -227,7 +236,8 @@ const API_GROUP_DESCRIPTIONS = {
   "math/time": "Easing & spring animation",
   "math/random": "Seeded random number generators",
   "math/noise": "Perlin, simplex & worley noise, plus fractal helpers",
-  "math/color": "Color & colorspace utilities",
+  "math/color":
+    "Color spaces (OKLab, OKLCH, Okhsl, Lab, HDR), CSS Color 4/5 parsing, gamut & tone mapping, GPU packing & shaders",
   "math/ik": "Inverse kinematics",
 };
 
@@ -288,8 +298,13 @@ const VALUE_CATEGORY_ORDER = [
 function classifyMember(name, nsLabel, isAlias) {
   if (isAlias) return "Aliases";
   // predicates, comparisons & accessors
-  if (/^(equals|exactEquals|finite|angle|angleTo|luminance)$/.test(name))
+  if (
+    /^(equals|exactEquals|finite|angle|angleTo|luminance|contrastRatio)$/.test(
+      name,
+    )
+  )
     return "Query";
+  if (/^deltaE/.test(name)) return "Query";
   if (/^(is|get|contains|intersects)[A-Z]/.test(name)) return "Query";
   // construction, conversion & setters
   if (
@@ -493,6 +508,17 @@ function getCompactMember(name, file) {
             kind: "alias",
             signature: `${name} = ${decl.initializer.text}`,
             summary: `Alias for \`${decl.initializer.text}\``,
+          };
+        } else if (
+          decl.initializer &&
+          ts.isStringLiteralLike(decl.initializer) &&
+          decl.initializer.text.length > 40
+        ) {
+          // long strings (shader sources) are summarized, not inlined
+          found = {
+            kind: "value",
+            signature: `${name}: string`,
+            summary: summaryOf(decl),
           };
         } else if (
           decl.initializer &&

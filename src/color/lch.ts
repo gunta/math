@@ -79,8 +79,8 @@ export function toColor(out: Color, a: Const<Lch>): Color {
 }
 
 /**
- * Interpolate from `a` to `b` by `t` into `out`, going around the hue circle by `hue`
- * (CSS Color 4 methods, default 'shorter'). A gray endpoint takes the other endpoint's hue. Returns `out`.
+ * Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+ * A gray endpoint takes the other endpoint's hue.
  */
 export function lerp(out: Lch, a: Const<Lch>, b: Const<Lch>, t: number, hue: HueInterpolation = 'shorter'): Lch {
     const ac = a[1];

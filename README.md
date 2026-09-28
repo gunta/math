@@ -26,7 +26,7 @@ Math is the playful web's math engine.
 | [`math/time`](API.md#api-math-time) | Easing & spring animation | [`easing`](API.md#api-math-time-easing) [`spring`](API.md#api-math-time-spring) [`spring2`](API.md#api-math-time-spring2) [`spring3`](API.md#api-math-time-spring3) [`spring4`](API.md#api-math-time-spring4) |
 | [`math/random`](API.md#api-math-random) | Seeded random number generators | [`isaac32`](API.md#api-math-random-isaac32) [`isaac64`](API.md#api-math-random-isaac64) [`mulberry32`](API.md#api-math-random-mulberry32) [`random`](API.md#api-math-random-random) |
 | [`math/noise`](API.md#api-math-noise) | Perlin, simplex & worley noise, plus fractal helpers | [`perlin2d`](API.md#api-math-noise-perlin2d) [`perlin3d`](API.md#api-math-noise-perlin3d) [`simplex2d`](API.md#api-math-noise-simplex2d) [`simplex3d`](API.md#api-math-noise-simplex3d) [`simplex4d`](API.md#api-math-noise-simplex4d) [`worley2d`](API.md#api-math-noise-worley2d) [`worley3d`](API.md#api-math-noise-worley3d) [`fbm`](API.md#fbm) [`ridged`](API.md#ridged) [`billow`](API.md#billow) [`domainWarp2`](API.md#domainwarp2) [`domainWarp3`](API.md#domainwarp3) [`curl2`](API.md#curl2) [`curl3`](API.md#curl3) |
-| [`math/color`](API.md#api-math-color) | Color & colorspace utilities | [`color`](API.md#api-math-color-color) [`colorspace`](API.md#api-math-color-colorspace) [`hsl`](API.md#api-math-color-hsl) |
+| [`math/color`](API.md#api-math-color) | Color spaces (OKLab, OKLCH, Okhsl, Lab, HDR), CSS Color 4/5 parsing, gamut & tone mapping, GPU packing & shaders | [`color`](API.md#api-math-color-color) [`colorspace`](API.md#api-math-color-colorspace) [`gamut`](API.md#api-math-color-gamut) [`glsl`](API.md#api-math-color-glsl) [`hsl`](API.md#api-math-color-hsl) [`ictcp`](API.md#api-math-color-ictcp) [`jzazbz`](API.md#api-math-color-jzazbz) [`jzczhz`](API.md#api-math-color-jzczhz) [`lab`](API.md#api-math-color-lab) [`lch`](API.md#api-math-color-lch) [`okhsl`](API.md#api-math-color-okhsl) [`okhsv`](API.md#api-math-color-okhsv) [`oklab`](API.md#api-math-color-oklab) [`oklch`](API.md#api-math-color-oklch) [`packing`](API.md#api-math-color-packing) [`tonemap`](API.md#api-math-color-tonemap) [`wgsl`](API.md#api-math-color-wgsl) |
 | [`math/ik`](API.md#api-math-ik) | Inverse kinematics | [`fabrik2`](API.md#api-math-ik-fabrik2) [`fabrik3`](API.md#api-math-ik-fabrik3) |
 
 
@@ -109,6 +109,7 @@ Math has a skill that teaches your agent how to get the most out of it. The skil
 <p align="center">
   <a href="https://pmndrs.github.io/math/examples/#example-frustum-culling"><img src="./examples/public/screenshots/example-frustum-culling.png" width="32%" alt="Frustum Culling" title="Frustum Culling" /></a>
   <a href="https://pmndrs.github.io/math/examples/#example-dual-quaternion-skinning"><img src="./examples/public/screenshots/example-dual-quaternion-skinning.png" width="32%" alt="Dual Quaternion Skinning" title="Dual Quaternion Skinning" /></a>
+  <a href="https://pmndrs.github.io/math/examples/#example-oklch-gradients"><img src="./examples/public/screenshots/example-oklch-gradients.png" width="32%" alt="OKLCH Gradients &amp; Tone Mapping" title="OKLCH Gradients &amp; Tone Mapping" /></a>
 </p>
 
 ## Documentation

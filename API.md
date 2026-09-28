@@ -11,7 +11,7 @@ overview, installation, and examples, see the [README](./README.md).
 - [`math/time`](#api-math-time) — Easing & spring animation
 - [`math/random`](#api-math-random) — Seeded random number generators
 - [`math/noise`](#api-math-noise) — Perlin, simplex & worley noise, plus fractal helpers
-- [`math/color`](#api-math-color) — Color & colorspace utilities
+- [`math/color`](#api-math-color) — Color spaces (OKLab, OKLCH, Okhsl, Lab, HDR), CSS Color 4/5 parsing, gamut & tone mapping, GPU packing & shaders
 - [`math/ik`](#api-math-ik) — Inverse kinematics
 
 ---
@@ -1421,9 +1421,20 @@ import { worley3d } from 'math/noise';
 
 ## `math/color`
 
-- `type Color = [ r: number, g: number, b: number ]` — A linear-sRGB color: [r, g, b] floats in [0, 1].
-- `type ColorInput = string | number | [ number, number, number ]` — Accepted input types for creating or parsing a Color.
+- `type Color = [ r: number, g: number, b: number, a?: number ]` — A linear-sRGB color: [r, g, b] floats with an optional straight (unpremultiplied) alpha.
+- `type ColorInput = string | number | Const<Color>` — Accepted input types for creating or parsing a Color.
+- `type CSSColorSpace = 'srgb' | 'srgb-linear' | 'display-p3' | 'display-p3-linear' | 'a98-rgb' | 'prophoto-rgb' | 'rec2020' | 'rec2100-pq' | 'rec2100-hlg' | 'rec2100-linear' | 'xyz' | 'xyz-d50' | 'xyz-d65'` — A predefined color space of the CSS color() function (CSS Color 4 and CSS Color HDR).
 - `type HSL = [ hue: number, saturation: number, lightness: number ]` — A hue-saturation-lightness color: [h, s, l], all in [0, 1] (hue wraps).
+- `type HueInterpolation = 'shorter' | 'longer' | 'increasing' | 'decreasing'` — A CSS Color 4 hue interpolation method, choosing which way around the hue circle to go.
+- `type ICtCp = [ i: number, ct: number, cp: number ]` — An ICtCp color: [I, Ct, Cp]. I is PQ intensity in [0, 1] (reference white is about 0.58), Ct and Cp in about [-0.5, 0.5].
+- `type Jzazbz = [ jz: number, az: number, bz: number ]` — A Jzazbz color: [Jz, az, bz]. Jz is lightness (reference white is about 0.22), az and bz in about [-0.21, 0.21].
+- `type Jzczhz = [ jz: number, cz: number, hz: number ]` — A JzCzhz color: [Jz, Cz, hz]. Jz is lightness, Cz is chroma (0 is gray), hz is hue in degrees.
+- `type Lab = [ l: number, a: number, b: number ]` — A CIE Lab (D50) color: [L, a, b]. L is lightness in [0, 100], a and b are opponent axes.
+- `type Lch = [ l: number, c: number, h: number ]` — A CIE LCH (D50) color: [L, C, h]. L in [0, 100], chroma C from 0 (gray) to about 150, hue in degrees.
+- `type Okhsl = [ h: number, s: number, l: number ]` — An Okhsl color: [h, s, l]. Hue in degrees, saturation and lightness in [0, 1].
+- `type Okhsv = [ h: number, s: number, v: number ]` — An Okhsv color: [h, s, v]. Hue in degrees, saturation and value in [0, 1].
+- `type Oklab = [ l: number, a: number, b: number ]` — An OKLab color: [L, a, b]. L is lightness (0 black, 1 reference white), a and b are opponent axes in about [-0.4, 0.4].
+- `type Oklch = [ l: number, c: number, h: number ]` — An OKLCH color: [L, C, h]. L is lightness in [0, 1], C is chroma (0 is gray, about 0.37 is the most vivid P3), h is hue in degrees.
 
 <a id="api-math-color-color"></a>
 
@@ -1435,33 +1446,43 @@ import { color } from 'math/color';
 
 **Create**
 
+- `color.setFromColorInput(out: Color, input: ColorInput): Color` — Parse any supported color input into linear `out`, or leave `out` unchanged if unrecognised. Returns `out`.
+- `color.fromColorInput(input: ColorInput): Color | null` — Parse any supported color input into a new linear Color (with alpha only when it is not 1), or null if unrecognised.
 - `color.create(): Color` — Create a new Color initialized to black [0, 0, 0].
-- `color.fromValues(r: number, g: number, b: number): Color` — Create a new Color with the given linear r, g, b values.
-- `color.clone(c: Color): Color` — Create a new Color that is a copy of `c`.
-- `color.copy(out: Color, src: Color): Color` — Copy the values from `src` into `out`. Returns `out`.
-- `color.set(out: Color, r: number, g: number, b: number): Color` — Set the linear r, g, b components of `out` directly. Returns `out`.
+- `color.fromValues(r: number, g: number, b: number, a?: number): Color` — Create a new Color with the given linear r, g, b values and an optional alpha.
+- `color.clone(c: Const<Color>): Color` — Create a new Color that is a copy of `c`, keeping its alpha if it has one.
+- `color.copy(out: Color, src: Const<Color>): Color` — Copy the values from `src` into `out`, including alpha when either has one. Returns `out`.
+- `color.set(out: Color, r: number, g: number, b: number, a?: number): Color` — Set the linear r, g, b components of `out` directly, and alpha when given. Returns `out`.
 - `color.setScalar(out: Color, s: number): Color` — Set all three channels of `out` to the same linear value `s` (a gray). Returns `out`.
-- `color.setFromSRGB(out: Color, srgb: [ number, number, number ]): Color` — Set `out` from an sRGB gamma-encoded [r, g, b] array with values in [0, 1].
-- `color.fromSRGB(srgb: [ number, number, number ]): Color` — Create a new Color from an sRGB gamma-encoded [r, g, b] array with values in [0, 1].
-- `color.toSRGB(out: [ number, number, number ], c: Color): [ number, number, number ]` — Write the sRGB gamma-encoded [r, g, b] of a linear Color into `out` (values [0, 1]).
-- `color.toCSS(c: Color): string` — Create a CSS `rgb(...)` string in sRGB gamma space (for HTML/canvas use).
-- `color.toHex(c: Color): number` — Convert to a 0xRRGGBB integer in sRGB gamma space.
-- `color.toHexString(c: Color): string` — Convert to a 6-digit sRGB hex string without a leading '#', e.g. 'ff8800'.
+- `color.setFromSRGB(out: Color, srgb: readonly [ number, number, number ]): Color` — Set `out` from an sRGB gamma-encoded [r, g, b] array with values in [0, 1].
+- `color.fromSRGB(srgb: readonly [ number, number, number ]): Color` — Create a new Color from an sRGB gamma-encoded [r, g, b] array with values in [0, 1].
+- `color.toSRGB(out: [ number, number, number ], c: Const<Color>): [ number, number, number ]` — Write the sRGB gamma-encoded [r, g, b] of a linear Color into `out` (values [0, 1]).
+- `color.fromBuffer(out: Color, buffer: ArrayLike<number>, startIndex: number): Color` — Read the r, g, b of a Color from `buffer` at `startIndex` into `out`. Returns `out`.
+- `color.toBuffer(outBuffer: MutableArrayLike<number>, c: Const<Color>, startIndex: number): MutableArrayLike<number>` — Write the r, g, b of `c` into `outBuffer` at `startIndex`. Returns `outBuffer`.
+- `color.toCSS(c: Const<Color>): string` — Create a CSS `rgb(...)` string (or `rgba(...)` with alpha) in sRGB gamma space, clamped to the sRGB gamut.
+- `color.toHex(c: Const<Color>): number` — Convert to a 0xRRGGBB integer in sRGB gamma space.
+- `color.toHexString(c: Const<Color>): string` — Convert to a 6-digit sRGB hex string without a leading '#', e.g. 'ff8800'.
 
 **Operations**
 
-- `color.add(out: Color, a: Color, b: Color): Color` — Add `a + b` component-wise into `out`. Returns `out`.
-- `color.addScalar(out: Color, a: Color, s: number): Color` — Add scalar `s` to each channel of `a` into `out`. Returns `out`.
-- `color.sub(out: Color, a: Color, b: Color): Color` — Subtract `a - b` component-wise into `out`. Returns `out`.
-- `color.multiply(out: Color, a: Color, b: Color): Color` — Multiply `a * b` component-wise into `out` (tinting). Returns `out`.
-- `color.multiplyScalar(out: Color, a: Color, s: number): Color` — Scale each channel of `a` by `s` into `out` (brightness). Returns `out`.
-- `color.lerp(out: Color, a: Color, b: Color, t: number): Color` — Linearly interpolate from `a` to `b` by `t` into `out` (physically-correct blend). Returns `out`.
-- `color.clamp(out: Color, c: Color): Color` — Clamp each channel of `c` to [0, 1] into `out`. Returns `out`.
+- `color.convertBuffer(outBuffer: MutableArrayLike<number>, buffer: ArrayLike<number>, convert: (out: [ number, number, number ], c: readonly [ number, number, number ]) => unknown, stride = 3): MutableArrayLike<number>` — Run a color function over every color packed in `buffer`, writing the results to `outBuffer`. Returns `outBuffer`.
+- `color.add(out: Color, a: Const<Color>, b: Const<Color>): Color` — Add `a + b` component-wise into `out`. Returns `out`.
+- `color.addScalar(out: Color, a: Const<Color>, s: number): Color` — Add scalar `s` to each channel of `a` into `out`. Returns `out`.
+- `color.sub(out: Color, a: Const<Color>, b: Const<Color>): Color` — Subtract `a - b` component-wise into `out`. Returns `out`.
+- `color.multiply(out: Color, a: Const<Color>, b: Const<Color>): Color` — Multiply `a * b` component-wise into `out` (tinting). Returns `out`.
+- `color.multiplyScalar(out: Color, a: Const<Color>, s: number): Color` — Scale each channel of `a` by `s` into `out` (brightness). Returns `out`.
+- `color.lerp(out: Color, a: Const<Color>, b: Const<Color>, t: number): Color` — Linearly interpolate from `a` to `b` by `t` into `out` (physically-correct blend). Returns `out`.
+- `color.premultiply(out: Color, c: Const<Color>): Color` — Multiply r, g, b by alpha into `out` (premultiplied alpha), keeping alpha. Returns `out`.
+- `color.unpremultiply(out: Color, c: Const<Color>): Color` — Divide premultiplied r, g, b by alpha into `out` (straight alpha), keeping alpha. Transparent stays black. Returns `out`.
+- `color.over(out: Color, src: Const<Color>, dst: Const<Color>): Color` — Composite `src` over `dst` into `out` (Porter-Duff source-over, straight alpha, in linear light).
+- `color.clamp(out: Color, c: Const<Color>): Color` — Clamp each channel of `c` to [0, 1] into `out`. Returns `out`.
+- `color.contrastColor(out: Color, background: Const<Color>): Color` — Write white or black into `out`, whichever contrasts more with `background` (CSS contrast-color()). Returns `out`.
 
 **Query**
 
-- `color.equals(a: Color, b: Color, epsilon = 0): boolean` — Whether `a` and `b` are equal, within an optional per-channel `epsilon` (default exact).
-- `color.luminance(c: Color): number` — Relative luminance in [0, 1] (Rec. 709 weights, on linear light).
+- `color.equals(a: Const<Color>, b: Const<Color>, epsilon = 0): boolean` — Whether `a` and `b` are equal (alpha included, missing alpha is 1), within an optional per-channel `epsilon`.
+- `color.luminance(c: Const<Color>): number` — Relative luminance in [0, 1] (Rec. 709 weights, on linear light).
+- `color.contrastRatio(a: Const<Color>, b: Const<Color>): number` — WCAG 2 contrast ratio between two colors, from 1 (none) to 21 (black on white). Order does not matter.
 
 <a id="api-math-color-colorspace"></a>
 
@@ -1471,10 +1492,87 @@ import { color } from 'math/color';
 import { colorspace } from 'math/color';
 ```
 
-- `colorspace.srgbToLinear(c: number): number` — Convert a single sRGB gamma-encoded channel [0, 1] to linear light [0, 1].
-- `colorspace.linearToSrgb(c: number): number` — Convert a single linear light channel [0, 1] to sRGB gamma-encoded [0, 1].
-- `colorspace.linearSrgbToLinearDisplayP3(out: Color, c: Color): Color` — Convert a linear-sRGB Color to linear Display-P3 primaries, into `out`. Returns `out`.
-- `colorspace.linearDisplayP3ToLinearSrgb(out: Color, c: Color): Color` — Convert a linear Display-P3 Color to linear-sRGB primaries, into `out`. Returns `out`.
+**Create**
+
+- `colorspace.toCSS(space: CSSColorSpace, values: Const<Color>, alpha = 1): string` — Create a CSS `color(<space> ...)` string from channel values already in `space`, with an optional alpha.
+
+**Operations**
+
+- `colorspace.srgbToLinear(c: number): number` — Convert a single sRGB gamma-encoded channel to linear light, sign-mirrored for extended range.
+- `colorspace.linearToSrgb(c: number): number` — Convert a single linear light channel to sRGB gamma-encoded, sign-mirrored for extended range.
+- `colorspace.a98RgbToLinear(c: number): number` — Convert a single A98 RGB (Adobe RGB 1998) encoded channel to linear light.
+- `colorspace.linearToA98Rgb(c: number): number` — Convert a single linear light channel to A98 RGB (Adobe RGB 1998) encoded.
+- `colorspace.prophotoRgbToLinear(c: number): number` — Convert a single ProPhoto RGB encoded channel to linear light (gamma 1.8 with a linear toe).
+- `colorspace.linearToProphotoRgb(c: number): number` — Convert a single linear light channel to ProPhoto RGB encoded (gamma 1.8 with a linear toe).
+- `colorspace.rec2020ToLinear(c: number): number` — Convert a single Rec.2020 encoded channel to linear light (BT.1886 gamma 2.4, as CSS Color 4 uses).
+- `colorspace.linearToRec2020(c: number): number` — Convert a single linear light channel to Rec.2020 encoded (BT.1886 gamma 2.4, as CSS Color 4 uses).
+- `colorspace.nitsToPq(nits: number): number` — Encode an absolute luminance in cd/m² (nits) with the SMPTE ST 2084 PQ curve, into [0, 1].
+- `colorspace.pqToNits(pq: number): number` — Decode a SMPTE ST 2084 PQ signal in [0, 1] to absolute luminance in cd/m² (nits).
+- `colorspace.linearToHlg(e: number): number` — Encode a scene-linear channel with the BT.2100 HLG OETF. 1 maps to 1, 1/12 maps to 0.5.
+- `colorspace.hlgToLinear(e: number): number` — Decode a BT.2100 HLG signal to scene-linear light (the inverse OETF).
+- `colorspace.linearSrgbToXyzD65(out: Color, c: Const<Color>): Color` — Convert linear sRGB to CIE XYZ relative to D65, into `out`. Returns `out`.
+- `colorspace.xyzD65ToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert CIE XYZ relative to D65 to linear sRGB, into `out`. Returns `out`.
+- `colorspace.linearSrgbToXyzD50(out: Color, c: Const<Color>): Color` — Convert linear sRGB to CIE XYZ relative to D50 (Bradford adapted), into `out`. Returns `out`.
+- `colorspace.xyzD50ToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert CIE XYZ relative to D50 to linear sRGB (Bradford adapted), into `out`. Returns `out`.
+- `colorspace.xyzD65ToXyzD50(out: Color, c: Const<Color>): Color` — Adapt CIE XYZ from the D65 white point to D50 (Bradford), into `out`. Returns `out`.
+- `colorspace.xyzD50ToXyzD65(out: Color, c: Const<Color>): Color` — Adapt CIE XYZ from the D50 white point to D65 (Bradford), into `out`. Returns `out`.
+- `colorspace.linearSrgbToLinearDisplayP3(out: Color, c: Const<Color>): Color` — Convert a linear-sRGB Color to linear Display P3 primaries, into `out`. Returns `out`.
+- `colorspace.linearDisplayP3ToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert a linear Display P3 Color to linear-sRGB primaries, into `out`. Returns `out`.
+- `colorspace.linearSrgbToLinearRec2020(out: Color, c: Const<Color>): Color` — Convert linear sRGB to linear Rec.2020 (and Rec.2100) primaries, into `out`. Returns `out`.
+- `colorspace.linearRec2020ToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert linear Rec.2020 (and Rec.2100) primaries to linear sRGB, into `out`. Returns `out`.
+- `colorspace.linearSrgbToLinearA98Rgb(out: Color, c: Const<Color>): Color` — Convert linear sRGB to linear A98 RGB (Adobe RGB 1998) primaries, into `out`. Returns `out`.
+- `colorspace.linearA98RgbToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert linear A98 RGB (Adobe RGB 1998) primaries to linear sRGB, into `out`. Returns `out`.
+- `colorspace.linearSrgbToLinearProphotoRgb(out: Color, c: Const<Color>): Color` — Convert linear sRGB to linear ProPhoto RGB primaries (D50, Bradford adapted), into `out`. Returns `out`.
+- `colorspace.linearProphotoRgbToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert linear ProPhoto RGB primaries (D50) to linear sRGB, Bradford adapted, into `out`. Returns `out`.
+- `colorspace.linearSrgbToDisplayP3(out: Color, c: Const<Color>): Color` — Convert linear sRGB to gamma-encoded Display P3 (as used by CSS `color(display-p3 ...)`), into `out`. Returns `out`.
+- `colorspace.displayP3ToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert gamma-encoded Display P3 to linear sRGB, into `out`. Returns `out`.
+- `colorspace.linearSrgbToRec2100Pq(out: Color, c: Const<Color>): Color` — Convert linear sRGB to a Rec.2100 PQ signal (HDR10), into `out`. Returns `out`.
+- `colorspace.rec2100PqToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert a Rec.2100 PQ signal (HDR10) to linear sRGB with 203 cd/m² as 1.0, into `out`. Returns `out`.
+- `colorspace.linearSrgbToRec2100Hlg(out: Color, c: Const<Color>): Color` — Convert linear sRGB to a Rec.2100 HLG signal, into `out`. Returns `out`.
+- `colorspace.rec2100HlgToLinearSrgb(out: Color, c: Const<Color>): Color` — Convert a Rec.2100 HLG signal to linear sRGB with reference white as 1.0, into `out`. Returns `out`.
+
+<a id="api-math-color-gamut"></a>
+
+### `gamut`
+
+```ts
+import { gamut } from 'math/color';
+```
+
+**Operations**
+
+- `gamut.clipToSrgb(out: Color, c: Const<Color>, peak = 1): Color` — Clamp linear Color `c` into the sRGB gamut [0, peak] into `out`, per channel. Returns `out`.
+- `gamut.clipToDisplayP3(out: Color, c: Const<Color>, peak = 1): Color` — Clamp linear Color `c` into the Display P3 gamut [0, peak] into `out`, per P3 channel. Returns `out`.
+- `gamut.clipToRec2020(out: Color, c: Const<Color>, peak = 1): Color` — Clamp linear Color `c` into the Rec.2020 gamut [0, peak] into `out`, per Rec.2020 channel. Returns `out`.
+- `gamut.mapToSrgb(out: Color, c: Const<Color>, peak = 1): Color` — Map linear Color `c` into the sRGB gamut [0, peak] into `out`, keeping its OKLCH lightness and hue. Returns `out`.
+- `gamut.mapToDisplayP3(out: Color, c: Const<Color>, peak = 1): Color` — Map linear Color `c` into the Display P3 gamut [0, peak] into `out`, keeping its OKLCH lightness and hue. Returns `out`.
+- `gamut.mapToRec2020(out: Color, c: Const<Color>, peak = 1): Color` — Map linear Color `c` into the Rec.2020 (Rec.2100) gamut [0, peak] into `out`, keeping its OKLCH lightness and hue. Returns `out`.
+
+**Query**
+
+- `gamut.isInSrgb(c: Const<Color>, peak = 1, epsilon = 0.000075): boolean` — Whether linear Color `c` is inside the sRGB gamut, with channels in [0, peak] within `epsilon`.
+- `gamut.isInDisplayP3(c: Const<Color>, peak = 1, epsilon = 0.000075): boolean` — Whether linear Color `c` is inside the Display P3 gamut, with channels in [0, peak] within `epsilon`.
+- `gamut.isInRec2020(c: Const<Color>, peak = 1, epsilon = 0.000075): boolean` — Whether linear Color `c` is inside the Rec.2020 (Rec.2100) gamut, with channels in [0, peak] within `epsilon`.
+
+<a id="api-math-color-glsl"></a>
+
+### `glsl`
+
+```ts
+import { glsl } from 'math/color';
+```
+
+- `glsl.srgb: string` — GLSL `srgbToLinear` and `linearToSrgb`, the sRGB transfer functions sign-mirrored for extended range.
+- `glsl.oklab: string` — GLSL `linearSrgbToOklab`, `oklabToLinearSrgb` and `mixOklab(a, b, t)`, which interpolates two linear sRGB colors through OKLab.
+- `glsl.oklch: string` — GLSL `oklabToOklch`, `oklchToOklab` and `mixOklch(a, b, t)` (shorter hue arc), which need the `oklab` snippet included first.
+- `glsl.displayP3: string` — GLSL `linearSrgbToLinearDisplayP3` and `linearDisplayP3ToLinearSrgb`, which convert between linear sRGB and Display P3 primaries.
+- `glsl.rec2020: string` — GLSL `linearSrgbToLinearRec2020` and `linearRec2020ToLinearSrgb`, which convert between linear sRGB and Rec.2020 primaries.
+- `glsl.pq: string` — GLSL `nitsToPq`, `pqToNits` (SMPTE ST 2084 in cd/m²) and `linearSrgbToRec2100Pq` for HDR10 output with 1.0 at 203 cd/m².
+- `glsl.hlg: string` — GLSL `linearToHlg` and `hlgToLinear`, the BT.2100 HLG OETF and its inverse, sign-mirrored.
+- `glsl.tonemapReinhard: string` — GLSL `tonemapReinhard` and `tonemapReinhardExtended(c, white)`, which saturates to 1 at `white`.
+- `glsl.tonemapAces: string` — GLSL `tonemapAcesFilmic`, ACES filmic tone mapping with the three.js 1 / 0.6 pre-exposure.
+- `glsl.tonemapAgx: string` — GLSL `tonemapAgx` and its helper `tonemapAgxContrast`, AgX tone mapping matching three.js AgXToneMapping.
+- `glsl.tonemapNeutral: string` — GLSL `tonemapNeutral`, Khronos PBR Neutral tone mapping matching three.js NeutralToneMapping.
 
 <a id="api-math-color-hsl"></a>
 
@@ -1488,16 +1586,308 @@ import { hsl } from 'math/color';
 
 - `hsl.create(): HSL` — Create a new HSL initialized to [0, 0, 0] (black).
 - `hsl.fromValues(h: number, s: number, l: number): HSL` — Create a new HSL with the given h, s, l values (all in [0, 1]).
-- `hsl.clone(a: HSL): HSL` — Create a new HSL that is a copy of `a`.
-- `hsl.copy(out: HSL, src: HSL): HSL` — Copy the values from `src` into `out`. Returns `out`.
+- `hsl.clone(a: Const<HSL>): HSL` — Create a new HSL that is a copy of `a`.
+- `hsl.copy(out: HSL, src: Const<HSL>): HSL` — Copy the values from `src` into `out`. Returns `out`.
 - `hsl.set(out: HSL, h: number, s: number, l: number): HSL` — Set the h, s, l components of `out` directly. Returns `out`.
-- `hsl.fromColor(out: HSL, c: Color): HSL` — Write the HSL of a linear Color into `out`. Returns `out`.
-- `hsl.toColor(out: Color, a: HSL): Color` — Write the linear Color of an HSL into `out`. Returns `out`.
+- `hsl.fromColor(out: HSL, c: Const<Color>): HSL` — Write the HSL of a linear Color into `out`. Returns `out`.
+- `hsl.toColor(out: Color, a: Const<HSL>): Color` — Write the linear Color of an HSL into `out`. Returns `out`.
 
 **Operations**
 
-- `hsl.lerp(out: HSL, a: HSL, b: HSL, t: number): HSL` — Interpolate from `a` to `b` by `t` into `out`, taking the shortest path around
-- `hsl.offset(out: HSL, a: HSL, dh: number, ds: number, dl: number): HSL` — Offset `a` by (dh, ds, dl) into `out`: hue wraps into [0, 1), saturation and
+- `hsl.lerp(out: HSL, a: Const<HSL>, b: Const<HSL>, t: number): HSL` — Interpolate from `a` to `b` by `t` into `out`, taking the shortest path around
+- `hsl.offset(out: HSL, a: Const<HSL>, dh: number, ds: number, dl: number): HSL` — Offset `a` by (dh, ds, dl) into `out`: hue wraps into [0, 1), saturation and
+
+<a id="api-math-color-ictcp"></a>
+
+### `ictcp`
+
+```ts
+import { ictcp } from 'math/color';
+```
+
+**Create**
+
+- `ictcp.create(): ICtCp` — Create a new ICtCp initialized to [0, 0, 0].
+- `ictcp.fromValues(i: number, ct: number, cp: number): ICtCp` — Create a new ICtCp with the given I, Ct, Cp values.
+- `ictcp.clone(a: Const<ICtCp>): ICtCp` — Create a new ICtCp that is a copy of `a`.
+- `ictcp.copy(out: ICtCp, src: Const<ICtCp>): ICtCp` — Copy the values from `src` into `out`. Returns `out`.
+- `ictcp.set(out: ICtCp, i: number, ct: number, cp: number): ICtCp` — Set the I, Ct, Cp components of `out` directly. Returns `out`.
+- `ictcp.fromColor(out: ICtCp, c: Const<Color>): ICtCp` — Write the ICtCp of a linear Color (1.0 = 203 cd/m²) into `out`. Returns `out`.
+- `ictcp.toColor(out: Color, a: Const<ICtCp>): Color` — Write the linear Color (1.0 = 203 cd/m²) of an ICtCp into `out`. Alpha in `out` is left untouched. Returns `out`.
+- `ictcp.toCSS(a: Const<ICtCp>, alpha = 1): string` — Create a CSS `ictcp(...)` string (CSS Color HDR), with an optional alpha.
+
+**Operations**
+
+- `ictcp.lerp(out: ICtCp, a: Const<ICtCp>, b: Const<ICtCp>, t: number): ICtCp` — Linearly interpolate from `a` to `b` by `t` into `out`. Returns `out`.
+
+**Query**
+
+- `ictcp.deltaEITP(a: Const<ICtCp>, b: Const<ICtCp>): number` — ΔE ITP (ITU-R BT.2124) HDR color difference. 1 is a just-noticeable difference.
+
+<a id="api-math-color-jzazbz"></a>
+
+### `jzazbz`
+
+```ts
+import { jzazbz } from 'math/color';
+```
+
+**Create**
+
+- `jzazbz.create(): Jzazbz` — Create a new Jzazbz initialized to [0, 0, 0].
+- `jzazbz.fromValues(jz: number, az: number, bz: number): Jzazbz` — Create a new Jzazbz with the given Jz, az, bz values.
+- `jzazbz.clone(a: Const<Jzazbz>): Jzazbz` — Create a new Jzazbz that is a copy of `a`.
+- `jzazbz.copy(out: Jzazbz, src: Const<Jzazbz>): Jzazbz` — Copy the values from `src` into `out`. Returns `out`.
+- `jzazbz.set(out: Jzazbz, jz: number, az: number, bz: number): Jzazbz` — Set the Jz, az, bz components of `out` directly. Returns `out`.
+- `jzazbz.fromColor(out: Jzazbz, c: Const<Color>): Jzazbz` — Write the Jzazbz of a linear Color (1.0 = 203 cd/m²) into `out`. Returns `out`.
+- `jzazbz.toColor(out: Color, a: Const<Jzazbz>): Color` — Write the linear Color (1.0 = 203 cd/m²) of a Jzazbz into `out`. Alpha in `out` is left untouched. Returns `out`.
+- `jzazbz.toCSS(a: Const<Jzazbz>, alpha = 1): string` — Create a CSS `jzazbz(...)` string (CSS Color HDR), with an optional alpha.
+
+**Operations**
+
+- `jzazbz.lerp(out: Jzazbz, a: Const<Jzazbz>, b: Const<Jzazbz>, t: number): Jzazbz` — Linearly interpolate from `a` to `b` by `t` into `out`. Returns `out`.
+
+<a id="api-math-color-jzczhz"></a>
+
+### `jzczhz`
+
+```ts
+import { jzczhz } from 'math/color';
+```
+
+**Create**
+
+- `jzczhz.create(): Jzczhz` — Create a new Jzczhz initialized to [0, 0, 0].
+- `jzczhz.fromValues(jz: number, cz: number, hz: number): Jzczhz` — Create a new Jzczhz with the given Jz, Cz, hz (degrees) values.
+- `jzczhz.clone(a: Const<Jzczhz>): Jzczhz` — Create a new Jzczhz that is a copy of `a`.
+- `jzczhz.copy(out: Jzczhz, src: Const<Jzczhz>): Jzczhz` — Copy the values from `src` into `out`. Returns `out`.
+- `jzczhz.set(out: Jzczhz, jz: number, cz: number, hz: number): Jzczhz` — Set the Jz, Cz, hz (degrees) components of `out` directly. Returns `out`.
+- `jzczhz.fromJzazbz(out: Jzczhz, a: Const<Jzazbz>): Jzczhz` — Write the JzCzhz of a Jzazbz color into `out`. Gray colors get hue 0. Returns `out`.
+- `jzczhz.toJzazbz(out: Jzazbz, a: Const<Jzczhz>): Jzazbz` — Write the Jzazbz of a JzCzhz color into `out`. Returns `out`.
+- `jzczhz.fromColor(out: Jzczhz, c: Const<Color>): Jzczhz` — Write the JzCzhz of a linear Color (1.0 = 203 cd/m²) into `out`. Returns `out`.
+- `jzczhz.toColor(out: Color, a: Const<Jzczhz>): Color` — Write the linear Color (1.0 = 203 cd/m²) of a JzCzhz into `out`. Alpha in `out` is left untouched. Returns `out`.
+- `jzczhz.toCSS(a: Const<Jzczhz>, alpha = 1): string` — Create a CSS `jzczhz(...)` string (CSS Color HDR), with an optional alpha.
+
+**Operations**
+
+- `jzczhz.lerp(out: Jzczhz, a: Const<Jzczhz>, b: Const<Jzczhz>, t: number, hue: HueInterpolation = 'shorter'): Jzczhz` — Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+
+**Query**
+
+- `jzczhz.deltaEJz(a: Const<Jzczhz>, b: Const<Jzczhz>): number` — ΔEz color difference in JzCzhz (Safdar et al. 2017), for HDR and wide gamut colors.
+
+<a id="api-math-color-lab"></a>
+
+### `lab`
+
+```ts
+import { lab } from 'math/color';
+```
+
+**Create**
+
+- `lab.create(): Lab` — Create a new Lab initialized to [0, 0, 0] (black).
+- `lab.fromValues(l: number, a: number, b: number): Lab` — Create a new Lab with the given L, a, b values.
+- `lab.clone(a: Const<Lab>): Lab` — Create a new Lab that is a copy of `a`.
+- `lab.copy(out: Lab, src: Const<Lab>): Lab` — Copy the values from `src` into `out`. Returns `out`.
+- `lab.set(out: Lab, l: number, a: number, b: number): Lab` — Set the L, a, b components of `out` directly. Returns `out`.
+- `lab.fromColor(out: Lab, c: Const<Color>): Lab` — Write the CIE Lab (D50) of a linear Color into `out`. Returns `out`.
+- `lab.toColor(out: Color, a: Const<Lab>): Color` — Write the linear Color of a CIE Lab (D50) into `out`. Alpha in `out` is left untouched. Returns `out`.
+- `lab.toCSS(a: Const<Lab>, alpha = 1): string` — Create a CSS `lab(...)` string, with an optional alpha.
+
+**Operations**
+
+- `lab.lerp(out: Lab, a: Const<Lab>, b: Const<Lab>, t: number): Lab` — Linearly interpolate from `a` to `b` by `t` into `out`. Returns `out`.
+
+**Query**
+
+- `lab.deltaE76(a: Const<Lab>, b: Const<Lab>): number` — CIE76 color difference: Euclidean distance in Lab. About 2.3 is a just-noticeable difference.
+- `lab.deltaE2000(a: Const<Lab>, b: Const<Lab>): number` — CIEDE2000 color difference (Sharma, Wu and Dalal 2005 formulation, kL = kC = kH = 1).
+
+<a id="api-math-color-lch"></a>
+
+### `lch`
+
+```ts
+import { lch } from 'math/color';
+```
+
+**Create**
+
+- `lch.create(): Lch` — Create a new Lch initialized to [0, 0, 0] (black).
+- `lch.fromValues(l: number, c: number, h: number): Lch` — Create a new Lch with the given L, C, h (degrees) values.
+- `lch.clone(a: Const<Lch>): Lch` — Create a new Lch that is a copy of `a`.
+- `lch.copy(out: Lch, src: Const<Lch>): Lch` — Copy the values from `src` into `out`. Returns `out`.
+- `lch.set(out: Lch, l: number, c: number, h: number): Lch` — Set the L, C, h (degrees) components of `out` directly. Returns `out`.
+- `lch.fromLab(out: Lch, a: Const<Lab>): Lch` — Write the LCH of a CIE Lab color into `out`. Gray colors get hue 0. Returns `out`.
+- `lch.toLab(out: Lab, a: Const<Lch>): Lab` — Write the CIE Lab of an LCH color into `out`. Returns `out`.
+- `lch.fromColor(out: Lch, c: Const<Color>): Lch` — Write the CIE LCH of a linear Color into `out`. Returns `out`.
+- `lch.toColor(out: Color, a: Const<Lch>): Color` — Write the linear Color of a CIE LCH into `out`. Alpha in `out` is left untouched. Returns `out`.
+- `lch.toCSS(a: Const<Lch>, alpha = 1): string` — Create a CSS `lch(...)` string, with an optional alpha.
+
+**Operations**
+
+- `lch.lerp(out: Lch, a: Const<Lch>, b: Const<Lch>, t: number, hue: HueInterpolation = 'shorter'): Lch` — Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+
+<a id="api-math-color-okhsl"></a>
+
+### `okhsl`
+
+```ts
+import { okhsl } from 'math/color';
+```
+
+**Create**
+
+- `okhsl.create(): Okhsl` — Create a new Okhsl initialized to [0, 0, 0] (black).
+- `okhsl.fromValues(h: number, s: number, l: number): Okhsl` — Create a new Okhsl with the given h (degrees), s, l values.
+- `okhsl.clone(a: Const<Okhsl>): Okhsl` — Create a new Okhsl that is a copy of `a`.
+- `okhsl.copy(out: Okhsl, src: Const<Okhsl>): Okhsl` — Copy the values from `src` into `out`. Returns `out`.
+- `okhsl.set(out: Okhsl, h: number, s: number, l: number): Okhsl` — Set the h (degrees), s, l components of `out` directly. Returns `out`.
+- `okhsl.fromOklab(out: Okhsl, lab: Const<Oklab>): Okhsl` — Write the Okhsl of an OKLab color into `out`. Gray colors get hue 0. Returns `out`.
+- `okhsl.toOklab(out: Oklab, a: Const<Okhsl>): Oklab` — Write the OKLab of an Okhsl color into `out`. Returns `out`.
+- `okhsl.fromColor(out: Okhsl, c: Const<Color>): Okhsl` — Write the Okhsl of a linear Color into `out`. Returns `out`.
+- `okhsl.toColor(out: Color, a: Const<Okhsl>): Color` — Write the linear Color of an Okhsl into `out`. Alpha in `out` is left untouched. Returns `out`.
+
+**Operations**
+
+- `okhsl.lerp(out: Okhsl, a: Const<Okhsl>, b: Const<Okhsl>, t: number, hue: HueInterpolation = 'shorter'): Okhsl` — Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+
+<a id="api-math-color-okhsv"></a>
+
+### `okhsv`
+
+```ts
+import { okhsv } from 'math/color';
+```
+
+**Create**
+
+- `okhsv.create(): Okhsv` — Create a new Okhsv initialized to [0, 0, 0] (black).
+- `okhsv.fromValues(h: number, s: number, v: number): Okhsv` — Create a new Okhsv with the given h (degrees), s, v values.
+- `okhsv.clone(a: Const<Okhsv>): Okhsv` — Create a new Okhsv that is a copy of `a`.
+- `okhsv.copy(out: Okhsv, src: Const<Okhsv>): Okhsv` — Copy the values from `src` into `out`. Returns `out`.
+- `okhsv.set(out: Okhsv, h: number, s: number, v: number): Okhsv` — Set the h (degrees), s, v components of `out` directly. Returns `out`.
+- `okhsv.fromOklab(out: Okhsv, lab: Const<Oklab>): Okhsv` — Write the Okhsv of an OKLab color into `out`. Gray colors get hue 0. Returns `out`.
+- `okhsv.toOklab(out: Oklab, a: Const<Okhsv>): Oklab` — Write the OKLab of an Okhsv color into `out`. Returns `out`.
+- `okhsv.fromColor(out: Okhsv, c: Const<Color>): Okhsv` — Write the Okhsv of a linear Color into `out`. Returns `out`.
+- `okhsv.toColor(out: Color, a: Const<Okhsv>): Color` — Write the linear Color of an Okhsv into `out`. Alpha in `out` is left untouched. Returns `out`.
+
+**Operations**
+
+- `okhsv.lerp(out: Okhsv, a: Const<Okhsv>, b: Const<Okhsv>, t: number, hue: HueInterpolation = 'shorter'): Okhsv` — Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+
+<a id="api-math-color-oklab"></a>
+
+### `oklab`
+
+```ts
+import { oklab } from 'math/color';
+```
+
+**Create**
+
+- `oklab.create(): Oklab` — Create a new Oklab initialized to [0, 0, 0] (black).
+- `oklab.fromValues(l: number, a: number, b: number): Oklab` — Create a new Oklab with the given L, a, b values.
+- `oklab.clone(a: Const<Oklab>): Oklab` — Create a new Oklab that is a copy of `a`.
+- `oklab.copy(out: Oklab, src: Const<Oklab>): Oklab` — Copy the values from `src` into `out`. Returns `out`.
+- `oklab.set(out: Oklab, l: number, a: number, b: number): Oklab` — Set the L, a, b components of `out` directly. Returns `out`.
+- `oklab.fromColor(out: Oklab, c: Const<Color>): Oklab` — Write the OKLab of a linear Color into `out`. Returns `out`.
+- `oklab.toColor(out: Color, a: Const<Oklab>): Color` — Write the linear Color of an OKLab into `out`. Alpha in `out` is left untouched. Returns `out`.
+- `oklab.toCSS(a: Const<Oklab>, alpha = 1): string` — Create a CSS `oklab(...)` string, with an optional alpha.
+
+**Operations**
+
+- `oklab.lerp(out: Oklab, a: Const<Oklab>, b: Const<Oklab>, t: number): Oklab` — Linearly interpolate from `a` to `b` by `t` into `out`. Returns `out`.
+- `oklab.mix(out: Color, a: Const<Color>, b: Const<Color>, t: number): Color` — Interpolate two linear Colors through OKLab by `t` into `out`, like CSS `color-mix(in oklab, ...)`. Returns `out`.
+
+**Query**
+
+- `oklab.deltaEOK(a: Const<Oklab>, b: Const<Oklab>): number` — Euclidean distance between two OKLab colors (ΔEOK). About 0.02 is a just-noticeable difference.
+
+<a id="api-math-color-oklch"></a>
+
+### `oklch`
+
+```ts
+import { oklch } from 'math/color';
+```
+
+**Create**
+
+- `oklch.create(): Oklch` — Create a new Oklch initialized to [0, 0, 0] (black).
+- `oklch.fromValues(l: number, c: number, h: number): Oklch` — Create a new Oklch with the given L, C, h (degrees) values.
+- `oklch.clone(a: Const<Oklch>): Oklch` — Create a new Oklch that is a copy of `a`.
+- `oklch.copy(out: Oklch, src: Const<Oklch>): Oklch` — Copy the values from `src` into `out`. Returns `out`.
+- `oklch.set(out: Oklch, l: number, c: number, h: number): Oklch` — Set the L, C, h (degrees) components of `out` directly. Returns `out`.
+- `oklch.fromOklab(out: Oklch, a: Const<Oklab>): Oklch` — Write the OKLCH of an OKLab color into `out`. Gray colors get hue 0. Returns `out`.
+- `oklch.toOklab(out: Oklab, a: Const<Oklch>): Oklab` — Write the OKLab of an OKLCH color into `out`. Returns `out`.
+- `oklch.fromColor(out: Oklch, c: Const<Color>): Oklch` — Write the OKLCH of a linear Color into `out`. Returns `out`.
+- `oklch.toColor(out: Color, a: Const<Oklch>): Color` — Write the linear Color of an OKLCH into `out`. Alpha in `out` is left untouched. Returns `out`.
+- `oklch.toCSS(a: Const<Oklch>, alpha = 1): string` — Create a CSS `oklch(...)` string, with an optional alpha.
+
+**Operations**
+
+- `oklch.lerp(out: Oklch, a: Const<Oklch>, b: Const<Oklch>, t: number, hue: HueInterpolation = 'shorter'): Oklch` — Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+- `oklch.mix(out: Color, a: Const<Color>, b: Const<Color>, t: number, hue: HueInterpolation = 'shorter'): Color` — Interpolate two linear Colors through OKLCH by `t` into `out`, like CSS `color-mix(in oklch, ...)`. Returns `out`.
+
+<a id="api-math-color-packing"></a>
+
+### `packing`
+
+```ts
+import { packing } from 'math/color';
+```
+
+- `packing.packRgba8unorm(c: Const<Color>): number` — Pack a Color into an 'rgba8unorm' texel, clamping to [0, 1] and using alpha 1 when absent.
+- `packing.unpackRgba8unorm(out: Color, v: number): Color` — Unpack an 'rgba8unorm' texel into `out`, including alpha. Returns `out`.
+- `packing.packRgba8unormSrgb(c: Const<Color>): number` — Pack a linear Color into an 'rgba8unorm-srgb' texel, sRGB encoding rgb and keeping alpha linear.
+- `packing.unpackRgba8unormSrgb(out: Color, v: number): Color` — Unpack an 'rgba8unorm-srgb' texel into a linear Color `out`, including alpha. Returns `out`.
+- `packing.packRgb10a2unorm(c: Const<Color>): number` — Pack a Color into an 'rgb10a2unorm' texel: 10 bits for r, g, b and 2 bits of alpha, clamped to [0, 1].
+- `packing.unpackRgb10a2unorm(out: Color, v: number): Color` — Unpack an 'rgb10a2unorm' texel into `out`, including alpha. Returns `out`.
+- `packing.packRgb9e5ufloat(c: Const<Color>): number` — Pack a Color into an 'rgb9e5ufloat' texel: three 9 bit mantissas sharing one 5 bit exponent.
+- `packing.unpackRgb9e5ufloat(out: Color, v: number): Color` — Unpack an 'rgb9e5ufloat' texel into `out`, leaving alpha untouched. Returns `out`.
+- `packing.packRg11b10ufloat(c: Const<Color>): number` — Pack a Color into an 'rg11b10ufloat' texel: unsigned 11 bit floats for r and g, 10 bit for b.
+- `packing.unpackRg11b10ufloat(out: Color, v: number): Color` — Unpack an 'rg11b10ufloat' texel into `out`, leaving alpha untouched. Returns `out`.
+- `packing.packRgbe(c: Const<Color>): number` — Pack a Color into a Radiance .hdr RGBE texel: 8 bit mantissas with a shared exponent byte.
+- `packing.unpackRgbe(out: Color, v: number): Color` — Unpack a Radiance .hdr RGBE texel into `out` as rgbe.c does, leaving alpha untouched. Returns `out`.
+- `packing.packHalf(x: number): number` — Pack a number into IEEE 754 binary16 (half float) bits, rounding to nearest even.
+- `packing.unpackHalf(h: number): number` — Unpack IEEE 754 binary16 (half float) bits into a number.
+
+<a id="api-math-color-tonemap"></a>
+
+### `tonemap`
+
+```ts
+import { tonemap } from 'math/color';
+```
+
+- `tonemap.reinhard(out: Color, c: Const<Color>): Color` — Reinhard tone mapping, c / (1 + c) per channel, mapping [0, inf) to [0, 1) with negatives at 0. Returns `out`.
+- `tonemap.reinhardExtended(out: Color, c: Const<Color>, white: number): Color` — Extended Reinhard tone mapping, c (1 + c / white²) / (1 + c) per channel, saturating to 1 at and above `white`.
+- `tonemap.acesFilmic(out: Color, c: Const<Color>): Color` — ACES filmic tone mapping using Stephen Hill's RRT and ODT fit, matching three.js ACESFilmicToneMapping.
+- `tonemap.agx(out: Color, c: Const<Color>): Color` — AgX tone mapping, matching three.js AgXToneMapping (Filament's port of Blender's AgX in Rec.2020 primaries).
+- `tonemap.neutral(out: Color, c: Const<Color>): Color` — Khronos PBR Neutral tone mapping, which keeps colors nearly unchanged below 0.76 and then compresses highlights.
+- `tonemap.mixHeadroom(out: Color, a: Const<Color>, headroomA: number, b: Const<Color>, headroomB: number, headroom: number): Color` — Interpolate between `a` graded for `headroomA` and `b` graded for `headroomB` at display `headroom`, into `out`.
+
+<a id="api-math-color-wgsl"></a>
+
+### `wgsl`
+
+```ts
+import { wgsl } from 'math/color';
+```
+
+- `wgsl.srgb: string` — WGSL `srgbToLinear` and `linearToSrgb`, the sRGB transfer functions sign-mirrored for extended range.
+- `wgsl.oklab: string` — WGSL `linearSrgbToOklab`, `oklabToLinearSrgb` and `mixOklab(a, b, t)`, which interpolates two linear sRGB colors through OKLab.
+- `wgsl.oklch: string` — WGSL `oklabToOklch`, `oklchToOklab` and `mixOklch(a, b, t)` (shorter hue arc), which need the `oklab` snippet.
+- `wgsl.displayP3: string` — WGSL `linearSrgbToLinearDisplayP3` and `linearDisplayP3ToLinearSrgb`, which convert between linear sRGB and Display P3 primaries.
+- `wgsl.rec2020: string` — WGSL `linearSrgbToLinearRec2020` and `linearRec2020ToLinearSrgb`, which convert between linear sRGB and Rec.2020 primaries.
+- `wgsl.pq: string` — WGSL `nitsToPq`, `pqToNits` (SMPTE ST 2084 in cd/m²) and `linearSrgbToRec2100Pq` for HDR10 output with 1.0 at 203 cd/m².
+- `wgsl.hlg: string` — WGSL `linearToHlg` and `hlgToLinear`, the BT.2100 HLG OETF and its inverse, sign-mirrored.
+- `wgsl.tonemapReinhard: string` — WGSL `tonemapReinhard` and `tonemapReinhardExtended(c, white)`, which saturates to 1 at `white`.
+- `wgsl.tonemapAces: string` — WGSL `tonemapAcesFilmic`, ACES filmic tone mapping with the three.js 1 / 0.6 pre-exposure.
+- `wgsl.tonemapAgx: string` — WGSL `tonemapAgx` and its helper `tonemapAgxContrast`, AgX tone mapping matching three.js AgXToneMapping.
+- `wgsl.tonemapNeutral: string` — WGSL `tonemapNeutral`, Khronos PBR Neutral tone mapping matching three.js NeutralToneMapping.
 
 <a id="api-math-ik"></a>
 

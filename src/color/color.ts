@@ -101,9 +101,9 @@ export function toBuffer(outBuffer: MutableArrayLike<number>, c: Const<Color>, s
 }
 
 /**
- * Run `convert` over every color packed in `buffer` (for example a Float32Array of vertex colors
- * or pixels), writing the results to `outBuffer`. Returns `outBuffer`.
+ * Run a color function over every color packed in `buffer`, writing the results to `outBuffer`. Returns `outBuffer`.
  *
+ * `buffer` is for example a Float32Array of vertex colors or pixels. *
  * `convert` is any `(out, c)` color function: a colorspace conversion, `oklab.fromColor`,
  * `tonemap.agx`, `gamut.mapToSrgb`, ... Colors are `stride` numbers apart. Only the first three
  * numbers of each color are converted. The rest (alpha) are copied across. `outBuffer` may be
@@ -281,8 +281,8 @@ export function contrastRatio(a: Const<Color>, b: Const<Color>): number {
 }
 
 /**
- * Write white or black into `out`, whichever has the higher WCAG 2 contrast against `background`
- * (CSS Color 5 contrast-color(), ties pick white). The result is always at least 4.58:1. Returns `out`.
+ * Write white or black into `out`, whichever contrasts more with `background` (CSS contrast-color()). Returns `out`.
+ * Uses the WCAG 2 contrast ratio, ties pick white, and the result is always at least 4.58:1.
  */
 export function contrastColor(out: Color, background: Const<Color>): Color {
     const l = Math.max(0, 0.2126 * background[0] + 0.7152 * background[1] + 0.0722 * background[2]);

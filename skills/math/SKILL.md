@@ -18,6 +18,7 @@ Every type is a plain fixed-length tuple of numbers — no classes, no wrappers,
 - `Euler` `[x, y, z, order?]`, radians, order defaulting to `'xyz'`
 - `Mat2` (4), `Mat2d` (6), `Mat3` (9), `Mat4` (16) — contiguous and column-major, with `Mat4` translation in `m[12]`, `m[13]`, `m[14]`
 - `Polar` `[r, theta]`, `Spherical` `[r, theta, phi]`
+- `Color` `[r, g, b, a?]` from `math/color`: linear sRGB, unbounded (outside [0, 1] is wide gamut, above 1 is HDR with 1.0 as reference white), optional straight alpha. Perceptual spaces are their own tuples (`Oklab`, `Oklch`, `Okhsl`, `Lab`, ...), hue in degrees
 
 ## Style
 
@@ -56,6 +57,17 @@ export function getWorldPosition(out: Vec3, world: World, i: number): Vec3 { /* 
 - In a **library**, annotate module-level factory calls `/* @__PURE__ */` so a consumer's bundler can drop the scratch when the function is tree-shaken out. Application code does not need it.
 
 Deliver the implementation with its assumptions, complexity, edge cases, and focused tests.
+
+## Color
+
+- **Light, blend, filter and shade in linear `Color`.** It is the cheapest space and the physically correct one: `color.lerp`, `color.over` and `color.multiply` are plain arithmetic.
+- **OKLab and OKLCH are for perceptual work, not speed.** Each conversion is two 3x3 matrices and three cube roots (OKLCH adds trig), several times a linear lerp. Use them for gradients (`oklab.mix`, `oklch.mix`), palettes and pickers (`okhsl`, `okhsv`), color difference (`oklab.deltaEOK`) and hue edits. Convert at the edges, once per color, not per pixel per frame where a linear blend would do.
+- **Parse once.** `color.fromColorInput` reads any modern CSS color (`color-mix()`, relative colors, `color(display-p3 ...)`) but allocates. Parse at setup and keep the tuple.
+- **Map into the gamut before storing.** Writing to 8-bit or unorm targets clips and shifts hue. `gamut.mapToSrgb` and `gamut.mapToDisplayP3` keep lightness and hue instead, and take a `peak` for HDR headroom.
+- **Tone map HDR before SDR output** (`tonemap.agx`, `tonemap.acesFilmic`, `tonemap.neutral`), in linear light, then encode.
+- **Pick the texel format for the target:** `packing.packRgba8unormSrgb` for 8-bit, `packing.packRgb10a2unorm` after `colorspace.linearSrgbToRec2100Pq` for HDR10, `packRgb9e5ufloat` or `packRg11b10ufloat` for compact HDR textures, `packHalf` for rgba16float.
+- **Bulk data:** `color.convertBuffer(out, src, fn, stride)` runs any `(out, c)` color function over a packed buffer.
+- **On the GPU** paste the matching `glsl.*` or `wgsl.*` snippets (same function names, same constants as the JS) rather than rederiving the math, and keep shading linear there too.
 
 ## Working with other libs
 

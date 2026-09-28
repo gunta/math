@@ -87,9 +87,8 @@ export function toColor(out: Color, a: Const<Oklch>): Color {
 }
 
 /**
- * Interpolate from `a` to `b` by `t` into `out`, going around the hue circle by `hue`
- * (CSS Color 4 methods, default 'shorter'). A gray endpoint takes the other endpoint's hue,
- * so white to blue stays blue instead of passing through red. Returns `out`.
+ * Interpolate from `a` to `b` by `t` into `out`, around the hue circle by a CSS `hue` method (default 'shorter'). Returns `out`.
+ * A gray endpoint takes the other endpoint's hue, so white to blue stays blue instead of passing through red.
  */
 export function lerp(out: Oklch, a: Const<Oklch>, b: Const<Oklch>, t: number, hue: HueInterpolation = 'shorter'): Oklch {
     const ac = a[1];
@@ -105,8 +104,8 @@ export function lerp(out: Oklch, a: Const<Oklch>, b: Const<Oklch>, t: number, hu
 }
 
 /**
- * Interpolate two linear Colors through OKLCH by `t` into `out`, the hue-preserving gradient
- * of CSS `color-mix(in oklch <hue> hue, ...)`. Alpha is interpolated premultiplied. Returns `out`.
+ * Interpolate two linear Colors through OKLCH by `t` into `out`, like CSS `color-mix(in oklch, ...)`. Returns `out`.
+ * The hue-preserving gradient, around the hue circle by `hue`. Alpha is interpolated premultiplied.
  */
 export function mix(out: Color, a: Const<Color>, b: Const<Color>, t: number, hue: HueInterpolation = 'shorter'): Color {
     const a0 = a[0];

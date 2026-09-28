@@ -174,8 +174,8 @@ const CSS_COLORS: Record<string, number> = {
 };
 
 /**
- * Parse any supported color input and write the result into `out`. Alpha is written when it is
- * not 1 or `out` has an alpha slot. `out` is left unchanged when the input is not recognised. Returns `out`.
+ * Parse any supported color input into linear `out`, or leave `out` unchanged if unrecognised. Returns `out`.
+ * Alpha is written when it is not 1 or `out` has an alpha slot.
  *
  * Supported inputs:
  *   - any CSS color string: '#f00', 'red', 'rgb(255 0 0 / 50%)', 'hsl(120deg 100% 50%)',
