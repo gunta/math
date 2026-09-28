@@ -77,6 +77,12 @@
         "tags": ["color", "hsl", "colorspace"],
         "category": "color"
     },
+    "example-oklch-gradients": {
+        "title": "OKLCH Gradients & Tone Mapping",
+        "description": "The same two colors blended in gamma sRGB, linear light, OKLab and OKLCH (short and long hue), then an HDR exposure ramp through math's tone mappers. Every pixel is mixed, gamut mapped into sRGB and packed with math/color. Click to cycle the endpoints.",
+        "tags": ["color", "oklab", "oklch", "gamut", "tonemap", "hdr", "packing"],
+        "category": "color"
+    },
     "example-ridged-noise-voxel-terrain": {
         "title": "Ridged Noise Voxel Terrain",
         "description": "A compact voxel landscape from math's ridged fBm, with isometric columns, fine seams, three face tones and purple summit caps. A culled mesher emits a quad only for exposed solid faces.",
