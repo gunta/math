@@ -1,6 +1,7 @@
 export * as color from './color';
 export * as colorspace from './colorspace';
 export * as gamut from './gamut';
+export * as glsl from './glsl';
 export * as hsl from './hsl';
 export * as ictcp from './ictcp';
 export * as jzazbz from './jzazbz';
@@ -13,6 +14,7 @@ export * as oklab from './oklab';
 export * as oklch from './oklch';
 export * as packing from './packing';
 export * as tonemap from './tonemap';
+export * as wgsl from './wgsl';
 
 export type { Color, ColorInput } from './color';
 export type { CSSColorSpace } from './colorspace';
