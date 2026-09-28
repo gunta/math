@@ -123,7 +123,7 @@ const jzConeToXyz = [
     [-0.09098281098284752, -0.3127282905230739, 1.5227665613052603],
 ];
 
-// 1.0 in linear sRGB is media white, 203 cd/m², and the PQ curve takes luminance / 10000
+// 1.0 in linear sRGB is media white, 203 cd/m², and the Jzazbz PQ curve takes luminance / 10000
 const absolute = 203 / 10000;
 
 const out = {
@@ -145,8 +145,8 @@ const out = {
     'oklab LMS to linear sRGB': mul(xyzToSrgb, oklabLmsToXyz),
     'lab linear sRGB to D50-relative XYZ': mul(diag(D50.map((v) => 1 / v)), mul(d65ToD50, srgbToXyz)),
     'lab D50-relative XYZ to linear sRGB': mul(mul(xyzToSrgb, d50ToD65), diag(D50)),
-    'ictcp linear sRGB to LMS / 10000': scale(mul(xyzToIctcpLms, srgbToXyz), absolute),
-    'ictcp LMS / 10000 to linear sRGB': scale(mul(xyzToSrgb, ictcpLmsToXyz), 1 / absolute),
+    'ictcp linear sRGB to absolute LMS (cd/m²)': scale(mul(xyzToIctcpLms, srgbToXyz), 203),
+    'ictcp absolute LMS (cd/m²) to linear sRGB': scale(mul(xyzToSrgb, ictcpLmsToXyz), 1 / 203),
     'jzazbz linear sRGB to cone / 10000': scale(mul(xyzToJzCone, mul(jzModify, srgbToXyz)), absolute),
     'jzazbz cone / 10000 to linear sRGB': scale(mul(xyzToSrgb, mul(jzUnmodify, jzConeToXyz)), 1 / absolute),
 };
